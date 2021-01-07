@@ -1,0 +1,18 @@
+<launch>
+  <arg name="parent_frame"  default="/map"/>
+  <arg name="child_frame" default="/camera_link"/>
+  <arg name="pose_name" default="/camera_pose"/>
+  <!-- <arg name="rate" default="1"/> -->
+
+  <node name="EstablishTF_Node" pkg="EstablishTF"  type="EstablishTF_Node" 
+        args = "$(arg parent_frame) $(arg child_frame) $(arg pose_name) " output="screen"/>
+
+  <arg name="focal_len"  default="1.0"/>
+  <arg name="field_size" default="0.25"/>
+  <arg name="resolution" default="0.1"/>
+  <arg name="cloud_name" default="/map_cloud"/>
+
+  <node name="Explore_Node" pkg="Explore"  type="Explore_Node" 
+        args = "$(arg focal_len) $(arg field_size) $(arg resolution) $(arg cloud_name) $(arg pose_name)  " output="screen"/>
+
+</launch>
