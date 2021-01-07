@@ -5,7 +5,6 @@
 #include <iostream>
 #include "tf/transform_datatypes.h"//转换函数头文件
 
-// using namespace ros;
 /** old code 
 // tf::StampedTransform map2odom_;
 tf::Transform map2odom_;

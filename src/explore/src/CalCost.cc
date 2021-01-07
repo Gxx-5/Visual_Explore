@@ -41,6 +41,7 @@ void printParams();
 void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud,vector<geometry_msgs::Point>& map_points);
 void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher publisher);
 void poseCallback(const geometry_msgs::PoseStamped &pose);
+void poseStampedCallback(const geometry_msgs::PoseStamped &pose);
 
 int main(int argc, char **argv)
 {
@@ -50,9 +51,10 @@ int main(int argc, char **argv)
 	parseParams(argc, argv);
 	printParams();
 	vector<geometry_msgs::Point> map_points;
-	ros::Subscriber pose_sub = n.subscribe(pose_name, 10, &poseCallback);
+	ros::Subscriber pose_sub = n.subscribe(pose_name, 10, &poseStampedCallback);
 	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,boost::bind(&preProcess,_1,map_points));
-	ros::Publisher pt_pub = n.advertise<sensor_msgs::PointCloud>("pt_cloud",10);
+
+	ros::Publisher pt_pub = n.advertise<sensor_msgs::PointCloud>("campt_cloud",10);
 
 	ros::Rate loop_rate(1);
 	while(ros::ok()){
@@ -78,7 +80,20 @@ void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud,vector<geometr
 	}
 }
 
-void poseCallback(const geometry_msgs::PoseStamped &pose){
+void poseCallback(const geometry_msgs::Pose &pose){
+	Eigen::Quaterniond quat;
+	quat.x() = pose.orientation.x;
+	quat.y() = pose.orientation.y;
+	quat.z() = pose.orientation.z;
+	quat.w() = pose.orientation.w;
+
+	Rwc = quat.toRotationMatrix();
+	Twc(0,0) = pose.position.x;
+	Twc(1,0) = pose.position.y;
+	Twc(2,0) = pose.position.z;
+}
+
+void poseStampedCallback(const geometry_msgs::PoseStamped &pose){
 	Eigen::Quaterniond quat;
 	quat.x() = pose.pose.orientation.x;
 	quat.y() = pose.pose.orientation.y;
