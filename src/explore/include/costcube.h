@@ -1,4 +1,4 @@
-#include <ros/ros.h>
+// #include <ros/ros.h>
 #include "geometry_msgs/Pose.h"
 #include "geometry_msgs/Point.h"
 #include <opencv2/core/core.hpp>
@@ -44,7 +44,7 @@ public:
         cv::Mat calCostCubeByBresenham3D(vector<geometry_msgs::Point> map_points);
         cv::Mat calCostCubeByDistance(vector<geometry_msgs::Point> map_points);
         void processMapPts(const std::vector<geometry_msgs::Point> &pts,bool cal_occupied_only=false);
-        void Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
+        bool Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
         float computeCostByDistance(const float distance);
         float dstFromVoxelToObstacle(vector<int> pos_id);
         float dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points);
@@ -62,5 +62,5 @@ private:
         int free_thresh = 5;
         int occupied_thresh = 5;
         double inscribed_radius_ = 0.01;
-        double cost_scaling_factor = 10.0;
+        double cost_scaling_factor = 1.0;
 };

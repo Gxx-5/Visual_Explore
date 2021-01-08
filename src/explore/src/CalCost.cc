@@ -13,6 +13,7 @@
 #include <Eigen/Eigen>
 #include <opencv2/core/core.hpp>
 #include "costcube.h"
+#include<mutex>
 
 using namespace std;
 
@@ -24,21 +25,22 @@ std::string cloud_name = "/map_cloud";
 std::string pose_name = "/camera_pose";
 Eigen::Matrix3d Rwc;
 Eigen::Vector3d Twc;
-cv::Mat costcube_map;
 
-// cv::Mat Tcw,Rcw,Rwc,tcw,twc;//Rotation, translation  and camera center(refer to ORB)
-CostCube COSTCUBE;
+vector<geometry_msgs::Point> map_points;//store map points within the field of vision
+
 //Publish
-ros::Publisher _pub_map_cloud;
-ros::Publisher _pub_cur_view_cloud;
-ros::Publisher _vis_pub,_vis_text_pub;
-ros::Publisher _costcloud_pub;
+ros::Publisher vis_pub,vis_text_pub;
+ros::Publisher costcloud_pub;
+ros::Publisher pt_pub;
+
+std::mutex mpt_mutex;
+std::mutex pose_mutex;
 
 void VisualizeCostCube(cv::Mat cost_map);
 void testColorfunc();
 void parseParams(int argc, char **argv);
 void printParams();
-void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud,vector<geometry_msgs::Point>& map_points);
+void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud);
 void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher publisher);
 void poseCallback(const geometry_msgs::PoseStamped &pose);
 void poseStampedCallback(const geometry_msgs::PoseStamped &pose);
@@ -50,26 +52,37 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	parseParams(argc, argv);
 	printParams();
-	vector<geometry_msgs::Point> map_points;
+	CostCube COSTCUBE(focal_len,field_size,resolution);
+
+	//Subscribe
 	ros::Subscriber pose_sub = n.subscribe(pose_name, 10, &poseStampedCallback);
-	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,boost::bind(&preProcess,_1,map_points));
+	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,boost::bind(&preProcess,_1,map_points));
+	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,&preProcess);
+	//Publish
+	pt_pub = n.advertise<sensor_msgs::PointCloud>("cam_pt_cloud",10);
+	vis_pub = n.advertise<visualization_msgs::MarkerArray>("costcube",10);
+	vis_text_pub = n.advertise<visualization_msgs::MarkerArray>("costcubetext",10);
+	costcloud_pub = n.advertise<sensor_msgs::PointCloud>("costcloud", 10);
 
-	ros::Publisher pt_pub = n.advertise<sensor_msgs::PointCloud>("campt_cloud",10);
-
-	ros::Rate loop_rate(1);
+	ros::Rate loop_rate(10);
 	while(ros::ok()){
-		PublishMapPoints(map_points,pt_pub);
-		costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
-		VisualizeCostCube(costcube_map);
+		{
+			unique_lock<mutex> mlock(mpt_mutex);
+			PublishMapPoints(map_points,pt_pub);
+			cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
+			VisualizeCostCube(costcube_map);
+		}
 		ros::spinOnce();
 		loop_rate.sleep();
 	}
 	return 1;
 }
 
-void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud,vector<geometry_msgs::Point>& map_points){	
+void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud){	
+	unique_lock<mutex> mlock(mpt_mutex);
+	unique_lock<mutex> plock(pose_mutex);
 	map_points.clear();
-	for(int i=0;i<pt_cloud->points.size();++i){
+	for(int i=0;i<pt_cloud->points.size();++i){		
 		geometry_msgs::Point point;
 		Eigen::Vector3d pos(pt_cloud->points[i].x,pt_cloud->points[i].y,pt_cloud->points[i].z);
 		pos = Rwc.inverse()*(pos - Twc);
@@ -78,9 +91,11 @@ void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud,vector<geometr
 		point.z = pos(2,0);
 		map_points.push_back(point);
 	}
+	// cout << map_points.size() << endl;
 }
 
 void poseCallback(const geometry_msgs::Pose &pose){
+	unique_lock<mutex> plock(pose_mutex);
 	Eigen::Quaterniond quat;
 	quat.x() = pose.orientation.x;
 	quat.y() = pose.orientation.y;
@@ -168,9 +183,8 @@ void testColorfunc(ros::Publisher vis_pub,ros::Publisher vis_text_pub){
 	visualization_msgs::MarkerArray markerTextArr;
 	visualization_msgs::Marker marker;
 	visualization_msgs::Marker marker_text;
-	marker.header.frame_id = "map";
+	marker.header.frame_id = "camera_link";
 	marker.header.stamp = ros::Time::now();
-	marker.ns = "";
 	marker.lifetime = ros::Duration();	
 	marker.type = visualization_msgs::Marker::CUBE;
 	marker.action = visualization_msgs::Marker::MODIFY;
@@ -184,7 +198,7 @@ void testColorfunc(ros::Publisher vis_pub,ros::Publisher vis_text_pub){
 	marker.color.a = 1.0; // Don't forget to set the alpha!
 	int marker_id = 0;
 
-	marker_text.header.frame_id = "map";
+	marker_text.header.frame_id = "camera_link";
 	marker_text.header.stamp = ros::Time::now();
 	marker_text.ns = "";
 	marker_text.lifetime = ros::Duration();	
@@ -288,13 +302,13 @@ void VisualizeCostCube(cv::Mat cost_map){
 		// cout << endl;
 	}
 	// cout << endl << endl;
-	_vis_pub.publish(markerArr);
-	_vis_text_pub.publish(markerTextArr);
+	vis_pub.publish(markerArr);
+	vis_text_pub.publish(markerTextArr);
 
 	sensor_msgs::PointCloud cloud;
 	int num_points = cost_map.size[0]*cost_map.size[1]*cost_map.size[2];
 	cloud.header.stamp = ros::Time::now();
-    	cloud.header.frame_id = "map";//填充 PointCloud 消息的头：frame 和 timestamp．
+    	cloud.header.frame_id = "camera_link";//填充 PointCloud 消息的头：frame 和 timestamp．
     	cloud.points.resize(num_points);//设置点云的数量．
  
     	//增加信道 "intensity" 并设置其大小，使与点云数量相匹配．
@@ -314,7 +328,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 				cloud.channels[0].values[i] = int(cur_cost*100);
 				i++;
     			}
-    _costcloud_pub.publish(cloud);
+    costcloud_pub.publish(cloud);
 }
 
 void parseParams(int argc, char **argv)
@@ -348,6 +362,6 @@ void printParams()
 	printf("focal_len: %f\n", focal_len);
 	printf("field_size: %f\n", field_size);
 	printf("resolution: %f\n", resolution);
-	printf("cloud_topic_name: %s\n", cloud_name);
-	printf("pose_topic_name: %s\n", pose_name);
+	printf("cloud_topic_name: %s\n", cloud_name.c_str());
+	printf("pose_topic_name: %s\n", pose_name.c_str());
 }

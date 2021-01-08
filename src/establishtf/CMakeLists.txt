@@ -19,10 +19,10 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(${PROJECT_NAME}_Node
+add_executable(${PROJECT_NAME}_node
  src/EstablishTfFromPose.cpp
  )
  
-target_link_libraries(${PROJECT_NAME}_Node 
+target_link_libraries(${PROJECT_NAME}_node 
 ${catkin_LIBRARIES}
 )

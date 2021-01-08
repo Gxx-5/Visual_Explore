@@ -58,19 +58,23 @@ void CostCube::processMapPts(const std::vector<geometry_msgs::Point> &pts,bool c
         // unsigned int end_id = start_id + n_pts;
         // for (unsigned int pt_id = start_id; pt_id < end_id; ++pt_id)
 
-        // int num;
+        int invalid_num = 0;
+        int distant_num = 0;
         for (unsigned int pt_id = 0; pt_id < pts.size(); ++pt_id)
         {
                 double dst = sqrt(pow((pts[pt_id].x),2)+pow((pts[pt_id].y),2)+pow((pts[pt_id].z),2));
-                if(dst > focal_len)
+                if(dst > focal_len){
                         continue;
-                Bresenham3D(pts[pt_id], occupied_counter, visit_counter,cal_occupied_only);
-                // num++;
+                        distant_num++;
+                }
+                if(!Bresenham3D(pts[pt_id], occupied_counter, visit_counter,cal_occupied_only))
+                        invalid_num++;
         }
         // cout << "size of occupied_ind after Bresenham3D algorithm: " << occupied_ind.size() << " , while size of map_points is " << pts.size() << endl;
+        // cout << "Within " << pts.size() << " points , there are " << distant_num << " distant points and " << invalid_num << " invalid points" << endl;
 }
 
-void CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only){
+bool CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only){
         // https://gist.github.com/yamamushi/5823518#file-bresenham3d-L11
         // int x1 = int(size[0]/2);
         // int y1 = int(size[1]/2);
@@ -85,15 +89,15 @@ void CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied
         int y2 = int((pt_pos.y )/resolution + y1);
         int z2 = int((pt_pos.z )/resolution  + z1);
 	if (x2 < 0 || x2 >= size[0]||y2 < 0 || y2 >= size[1]||z2 < 0 || z2 >= size[2]){
-                cout << "Target index [ "<< x2 << " , " << y2 << " , " << z2 << " ] out of bound [" << size[0] << " , " 
-                          << size[1] << " , " << size[2]  << "](maximum) when calculating Bresenham3D" << endl;
-                return;
+                // cout << "Target index ["<< x2 << "," << y2 << "," << z2 << "] out of bound [" << size[0] << "," 
+                //           << size[1] << "," << size[2]  << "](maximum) when calculating Bresenham3D" << endl;
+                return false;
         }
 	// Increment the occupency account of the grid cell where map point is located
 	++occupied.at<int>(x2,y2,z2);
         occupied_ind.push_back(vector<int>{x2,y2,z2});
         if(cal_occupied_only) 
-                return;
+                return true;
         else{
                 int i, dx, dy, dz, l, m, n, x_inc, y_inc, z_inc, err_1, err_2, dx2, dy2, dz2;
                 int point[3];
@@ -168,6 +172,7 @@ void CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied
                 }
                 ++visited.at<int>(point[0], point[1], point[2]);
         }
+        return true;
 }
 
 cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points){
@@ -184,10 +189,11 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
                                 // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei});
                                 float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_points);
                                 dst_mat.at<float>(row, col, hei) = dst;
-                                if(dst == -1)//something wrong happen,dont change map_prob
+                                // cout << "dst: " << dst << endl;
+                                if(dst < 0)//something wrong happen,dont change map_prob
                                         return map_prob;
                                 map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
-                                // cout << dst << " " <<  computeCostByDistance(dst) << endl;
+                                // cout << "dst: " <<  dst << " " << ",cost : " <<  computeCostByDistance(dst) << endl;
                         }
         return map_prob;
 }
@@ -245,21 +251,15 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
 }
 
 float CostCube::computeCostByDistance(const float distance)
-  {
-//     unsigned char cost = 0;
-//     if (distance == 0)
-//       cost = LETHAL_OBSTACLE;
-//     else if (distance  <= inscribed_radius_)
-//       cost = INSCRIBED_INFLATED_OBSTACLE;
-//     else
-//     {
+{
         float cost;
         if(distance < inscribed_radius_){
-                cost = 255;                
+                cost = 1.0;
         }
         else{
-                float cost = exp(-1.0 * cost_scaling_factor * (distance - inscribed_radius_));
+                cost = exp(-1.0 * cost_scaling_factor * (distance - inscribed_radius_));
                 // cost = 255 * cost;//(unsigned char)((INSCRIBED_INFLATED_OBSTACLE - 1) * factor);
         }
+        // cout << "compute process : dst: " << distance << " cost: " <<  cost << endl;
         return cost;
-  }
+}   

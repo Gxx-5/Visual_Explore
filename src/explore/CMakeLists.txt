@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(explore)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -Wall -std=c++11 -pthread -g -march=native")
+
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   roscpp
