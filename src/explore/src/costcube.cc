@@ -1,19 +1,21 @@
 #include "costcube.h"
 
-CostCube::CostCube(double _focal_len,double _field_size,double _resolution,float _dst_filter_factor){
+CostCube::CostCube(double _focal_len,double _field_size,double _resolution,double _dst_filter_factor,double _cost_scaling_factor){
         focal_len = _focal_len;
         field_size = _field_size;
         resolution = _resolution;
         dst_filter_factor = _dst_filter_factor;
+        cost_scaling_factor = _cost_scaling_factor;
         size[0] = size[1] = 2 * field_size / resolution;
         size[2] = focal_len / resolution;
 }
 
-void CostCube::reinitialize(double _focal_len,double _field_size,double _resolution,float _dst_filter_factor){
+void CostCube::reinitialize(double _focal_len,double _field_size,double _resolution,double _dst_filter_factor,double _cost_scaling_factor){
         focal_len = _focal_len;
         field_size = _field_size;
         resolution = _resolution;
         dst_filter_factor = _dst_filter_factor;
+        cost_scaling_factor = _cost_scaling_factor;
         size[0] = size[1] = 2 * field_size / resolution;
         size[2] = focal_len / resolution;
 }

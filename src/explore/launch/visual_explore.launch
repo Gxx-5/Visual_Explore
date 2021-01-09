@@ -11,9 +11,10 @@
   <arg name="field_size" default="0.2"/>
   <arg name="resolution" default="0.03"/>
   <arg name="dst_filter_factor" default="0.1"/>
+  <arg name="cost_scaling_factor" default="10.0"/>
   <arg name="cloud_name" default="/cur_kp_cloud"/>  <!--rostopic type : sensor_msgs::PointCloud-->
 
   <node name="explore_node" pkg="explore"  type="explore_node" 
-        args = "$(arg focal_len) $(arg field_size) $(arg resolution) $(arg dst_filter_factor) $(arg cloud_name) $(arg pose_name)  " output="screen"/>
+        args = "$(arg cloud_name) $(arg pose_name) $(arg focal_len) $(arg field_size) $(arg resolution) $(arg dst_filter_factor)  $(arg cost_scaling_factor)" output="screen"/>
 
 </launch>

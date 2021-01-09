@@ -21,7 +21,8 @@ using namespace std;
 double focal_len = 1.0;
 double field_size = 0.25;
 double resolution = 0.1;
-float dst_filter_factor = 0.1;
+double dst_filter_factor = 0.1;
+double cost_scaling_factor = 10.0;
 std::string cloud_name = "/map_cloud";
 std::string pose_name = "/camera_pose";
 Eigen::Matrix3d Rwc;
@@ -54,7 +55,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	parseParams(argc, argv);
 	printParams();
-	CostCube COSTCUBE(focal_len,field_size,resolution,dst_filter_factor);
+	CostCube COSTCUBE(focal_len,field_size,resolution,dst_filter_factor,cost_scaling_factor);
 
 	//Subscribe
 	ros::Subscriber pose_sub = n.subscribe(pose_name, 10, &poseStampedCallback);
@@ -371,6 +372,14 @@ void parseParams(int argc, char **argv)
 	int arg_id = 1;
 	if (argc > arg_id)
 	{
+		cloud_name = argv[arg_id++];
+	}
+	if (argc > arg_id)
+	{
+		pose_name = argv[arg_id++];
+	}
+	if (argc > arg_id)
+	{
 		focal_len = atof(argv[arg_id++]);
 	}
 	if (argc > arg_id)
@@ -387,11 +396,7 @@ void parseParams(int argc, char **argv)
 	}
 	if (argc > arg_id)
 	{
-		cloud_name = argv[arg_id++];
-	}
-	if (argc > arg_id)
-	{
-		pose_name = argv[arg_id++];
+		cost_scaling_factor = atof(argv[arg_id++]);
 	}
 }
 
