@@ -29,8 +29,9 @@ Eigen::Vector3d Twc;
 vector<geometry_msgs::Point> map_points;//store map points within the field of vision
 
 //Publish
-ros::Publisher vis_pub,vis_text_pub;
+ros::Publisher vis_pub,vis_text_pub,slice_text_pub;
 ros::Publisher costcloud_pub;
+ros::Publisher costcloud_slice_pub;
 ros::Publisher pt_pub;
 
 std::mutex mpt_mutex;
@@ -61,8 +62,10 @@ int main(int argc, char **argv)
 	//Publish
 	pt_pub = n.advertise<sensor_msgs::PointCloud>("cam_pt_cloud",10);
 	vis_pub = n.advertise<visualization_msgs::MarkerArray>("costcube",10);
-	vis_text_pub = n.advertise<visualization_msgs::MarkerArray>("costcubetext",10);
+	vis_text_pub = n.advertise<visualization_msgs::MarkerArray>("cost_text",10);
+	slice_text_pub = n.advertise<visualization_msgs::MarkerArray>("slice_text", 10);
 	costcloud_pub = n.advertise<sensor_msgs::PointCloud>("costcloud", 10);
+	costcloud_slice_pub = n.advertise<sensor_msgs::PointCloud>("slice_costcloud", 10);
 
 	ros::Rate loop_rate(10);
 	while(ros::ok()){
@@ -238,6 +241,9 @@ void VisualizeCostCube(cv::Mat cost_map){
 		return;
 	}
 	visualization_msgs::MarkerArray markerArr;
+	visualization_msgs::MarkerArray markerTextArr;
+	visualization_msgs::MarkerArray markerSliceTextArr;
+
 	visualization_msgs::Marker marker;
 	marker.header.frame_id = "camera_link";
 	marker.header.stamp = ros::Time::now();
@@ -253,8 +259,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 	marker.scale.y = 0.8 * resolution;
 	marker.scale.z = 0.8 * resolution;
 	marker.color.a = 0.1; // Don't forget to set the alpha!
-
-	visualization_msgs::MarkerArray markerTextArr;
+	
 	visualization_msgs::Marker marker_text;
 	marker_text.header.frame_id = "camera_link";
 	marker_text.header.stamp = ros::Time::now();
@@ -296,6 +301,9 @@ void VisualizeCostCube(cv::Mat cost_map){
 				// cout << to_string(cur_cost).substr(0,4);
 				marker_text.id = marker_id - 1;
 				markerTextArr.markers.push_back(marker_text);
+				if(col==cam_posid[1]){
+					markerSliceTextArr.markers.push_back(marker_text);
+				}
 			}
 			// cout << endl;
 		}
@@ -304,20 +312,26 @@ void VisualizeCostCube(cv::Mat cost_map){
 	// cout << endl << endl;
 	vis_pub.publish(markerArr);
 	vis_text_pub.publish(markerTextArr);
+	slice_text_pub.publish(markerSliceTextArr);
 
 	sensor_msgs::PointCloud cloud;
-	int num_points = cost_map.size[0]*cost_map.size[1]*cost_map.size[2];
+	int pt_num = cost_map.size[0]*cost_map.size[1]*cost_map.size[2];
 	cloud.header.stamp = ros::Time::now();
     	cloud.header.frame_id = "camera_link";//填充 PointCloud 消息的头：frame 和 timestamp．
-    	cloud.points.resize(num_points);//设置点云的数量．
+    	cloud.points.resize(pt_num);//设置点云的数量．
  
     	//增加信道 "intensity" 并设置其大小，使与点云数量相匹配．
     	cloud.channels.resize(1);
     	cloud.channels[0].name = "intensities";
-    	cloud.channels[0].values.resize(num_points);
+    	cloud.channels[0].values.resize(pt_num);
+
+	sensor_msgs::PointCloud slice_cloud = cloud;
+	int slice_pt_num = cost_map.size[1]*cost_map.size[2];
+	slice_cloud.points.resize(slice_pt_num);
+	slice_cloud.channels[0].values.resize(slice_pt_num);
 
 	//使用虚拟数据填充 PointCloud 消息．同时，使用虚拟数据填充 intensity 信道．
-	int i = 0;
+	int i=0,j = 0;
     	for (int row = 0; row < cost_map.size[0]; ++row)
 		for (int col = 0; col < cost_map.size[1]; ++col)
                         for (int hei = 0;hei < cost_map.size[2]; ++ hei){
@@ -325,10 +339,17 @@ void VisualizeCostCube(cv::Mat cost_map){
 				cloud.points[i].y = (col - cam_posid[1]) * resolution;
 				cloud.points[i].z =  (hei - cam_posid[2]) * resolution;
 				float cur_cost = cost_map.at<float>(row, col, hei);
-				cloud.channels[0].values[i] = int(cur_cost*100);
+				cloud.channels[0].values[i] = int(cur_cost*100);				
+
+				if(col==cam_posid[1]){
+					slice_cloud.points[j] = cloud.points[i];
+					slice_cloud.channels[0].values[j] = cloud.channels[0].values[i];
+					j++;
+				}
 				i++;
     			}
-    costcloud_pub.publish(cloud);
+    	costcloud_pub.publish(cloud);
+	costcloud_slice_pub.publish(slice_cloud);
 }
 
 void parseParams(int argc, char **argv)
@@ -365,3 +386,4 @@ void printParams()
 	printf("cloud_topic_name: %s\n", cloud_name.c_str());
 	printf("pose_topic_name: %s\n", pose_name.c_str());
 }
+

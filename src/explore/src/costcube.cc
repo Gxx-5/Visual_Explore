@@ -82,12 +82,14 @@ bool CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied
         // int x2 = int((pt_pos.x - cam_pos.x)/resolution + size[0]/2);
         // int y2 = int((pt_pos.y - cam_pos.y)/resolution + size[1]/2);
         // int z2 = int((pt_pos.z - cam_pos.z)/resolution + size[2]/2);
-        int x1 = int(size[0]/2);
-        int y1 = int(size[1]/2);
-        int z1 = 0;
-        int x2 = int((pt_pos.x )/resolution + x1);
-        int y2 = int((pt_pos.y )/resolution + y1);
-        int z2 = int((pt_pos.z )/resolution  + z1);
+
+        // int x1 = int(size[0]/2);
+        // int y1 = int(size[1]/2);
+        // int z1 = 0;
+        vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+        int x2 = int((pt_pos.x )/resolution + cam_posid[0]);
+        int y2 = int((pt_pos.y )/resolution + cam_posid[1]);
+        int z2 = int((pt_pos.z )/resolution  + cam_posid[2]);
 	if (x2 < 0 || x2 >= size[0]||y2 < 0 || y2 >= size[1]||z2 < 0 || z2 >= size[2]){
                 // cout << "Target index ["<< x2 << "," << y2 << "," << z2 << "] out of bound [" << size[0] << "," 
                 //           << size[1] << "," << size[2]  << "](maximum) when calculating Bresenham3D" << endl;
@@ -102,12 +104,12 @@ bool CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied
                 int i, dx, dy, dz, l, m, n, x_inc, y_inc, z_inc, err_1, err_2, dx2, dy2, dz2;
                 int point[3];
                 
-                point[0] = x1;
-                point[1] = y1;
-                point[2] = z1;
-                dx = x2 - x1;
-                dy = y2 - y1;
-                dz = z2 - z1;
+                point[0] = cam_posid[0];
+                point[1] = cam_posid[1];
+                point[2] = cam_posid[2];
+                dx = x2 - cam_posid[0];
+                dy = y2 - cam_posid[1];
+                dz = z2 - cam_posid[2];
                 x_inc = (dx < 0) ? -1 : 1;
                 l = abs(dx);
                 y_inc = (dy < 0) ? -1 : 1;
@@ -189,10 +191,12 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
                                 // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei});
                                 float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_points);
                                 dst_mat.at<float>(row, col, hei) = dst;
-                                // cout << "dst: " << dst << endl;
-                                if(dst < 0)//something wrong happen,dont change map_prob
+                                if(dst < 0){//something wrong happen,dont change map_prob
+                                        cout << "something wrong happen while calculating CostCube by Distance." << endl;
                                         return map_prob;
-                                map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
+                                }
+                                // map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
+                                map_prob.at<float>(row, col, hei) = dst; 
                                 // cout << "dst: " <<  dst << " " << ",cost : " <<  computeCostByDistance(dst) << endl;
                         }
         return map_prob;
@@ -232,14 +236,26 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
                 return -1;
         }
         vector<float> dst_vec;
-        float x = (pos_id[0] - size[0]/2) * resolution;
-        float y = (pos_id[1] - size[1]/2) * resolution;
-        float z = (pos_id[2] - size[2]/2) * resolution;
+        vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+        float x = (pos_id[0] -cam_posid[0]) * resolution;
+        float y = (pos_id[1] - cam_posid[1]) * resolution;
+        float z = (pos_id[2] - cam_posid[2]) * resolution;
         for(uint i=0;i<map_points.size();++i){
                 float dst = sqrt(pow(map_points[i].x - x , 2) + pow(map_points[i].y - y , 2) + pow(map_points[i].z-z , 2));
                 dst_vec.push_back(dst);
+                if(dst < 0){
+                        cout << "error occur when calculating obstacle distance. map_point: [" <<  map_points[i].x << "," <<  map_points[i].y << "," <<  map_points[i].z << "],cur_pos: [" << x << "," << y << "," << z << "]" << endl;
+                }
         }
-        sort(dst_vec.begin(),dst_vec.end());        
+        sort(dst_vec.begin(),dst_vec.end());
+        //test
+        for(vector<float>::iterator it=dst_vec.begin();it!=dst_vec.end()-1;++it){
+                if(*it>*(it+1)){
+                        cout << "sort func wrong! " << *it << " and " << *(it+1) << endl;
+                }
+                cout << *it << endl;
+        }
+        cout << endl;
         float dst_thresh = (dst_vec.back() - dst_vec.front()) * occ_scale +dst_vec.front() ;
         // cout << occ_n << " " << dst_thresh << " "<<  dst_vec.back() << " " << dst_vec.front() << endl;
         float dst = 0.0;
@@ -262,4 +278,4 @@ float CostCube::computeCostByDistance(const float distance)
         }
         // cout << "compute process : dst: " << distance << " cost: " <<  cost << endl;
         return cost;
-}   
+}

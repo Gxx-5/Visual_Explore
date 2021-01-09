@@ -53,7 +53,7 @@ private:
         double field_size = 0.15;
         double focal_len = 0.5;
         double resolution = 0.05;
-        float occ_scale = 0.2;
+        float occ_scale = 1.0;
         // int voxel_nxy;
         // int voxel_nz;
         int size[3];
