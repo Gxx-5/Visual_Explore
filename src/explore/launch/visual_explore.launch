@@ -2,14 +2,14 @@
   <arg name="parent_frame"  default="/map"/>
   <arg name="child_frame" default="/camera_link"/>
   <arg name="pose_name" default="/cur_camera_pose"/> <!--rostopic type : geometry_msgs::PoseStamped-->
-  <arg name="rate" default="10"/>
+  <arg name="rate" default="100"/>
 
   <node name="establishtf_node" pkg="establishtf"  type="establishtf_node" 
         args = "$(arg parent_frame) $(arg child_frame) $(arg pose_name)  $(arg rate)" output="screen"/>
 
-  <arg name="focal_len"  default="0.5"/>
+  <arg name="focal_len"  default="0.3"/>
   <arg name="field_size" default="0.2"/>
-  <arg name="resolution" default="0.03"/>
+  <arg name="resolution" default="0.01"/>
   <arg name="dst_filter_factor" default="0.1"/>
   <arg name="cost_scaling_factor" default="10.0"/>
   <arg name="cloud_name" default="/cur_kp_cloud"/>  <!--rostopic type : sensor_msgs::PointCloud-->
