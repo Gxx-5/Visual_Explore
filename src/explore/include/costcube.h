@@ -38,9 +38,9 @@ public:
         cv::Mat map_prob;
         cv::Mat dst_mat;
 
-        CostCube(double focal_len,double field_size,double resolution);
+        CostCube(double _focal_len,double _field_size,double _resolution,float _dst_filter_factor = 0.1);
         CostCube(){}
-        void reinitialize(double focal_len,double field_size,double resolution);
+        void reinitialize(double focal_len,double field_size,double resolution,float _dst_filter_factor = 0.1);
         cv::Mat calCostCubeByBresenham3D(vector<geometry_msgs::Point> map_points);
         cv::Mat calCostCubeByDistance(vector<geometry_msgs::Point> map_points);
         void processMapPts(const std::vector<geometry_msgs::Point> &pts,bool cal_occupied_only=false);
@@ -53,7 +53,7 @@ private:
         double field_size = 0.15;
         double focal_len = 0.5;
         double resolution = 0.05;
-        float occ_scale = 1.0;
+        float dst_filter_factor = 0.1;//the proportion to keep nearby points calculated by distance.
         // int voxel_nxy;
         // int voxel_nz;
         int size[3];
@@ -62,5 +62,5 @@ private:
         int free_thresh = 5;
         int occupied_thresh = 5;
         double inscribed_radius_ = 0.01;
-        double cost_scaling_factor = 1.0;
+        double cost_scaling_factor = 1.0;//the weight of distance in cost calculation (same as costmap).
 };

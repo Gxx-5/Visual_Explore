@@ -1,17 +1,19 @@
 #include "costcube.h"
 
-CostCube::CostCube(double focal_len,double field_size,double resolution){
-        focal_len = focal_len;
-        field_size = field_size;
-        resolution = resolution;
+CostCube::CostCube(double _focal_len,double _field_size,double _resolution,float _dst_filter_factor){
+        focal_len = _focal_len;
+        field_size = _field_size;
+        resolution = _resolution;
+        dst_filter_factor = _dst_filter_factor;
         size[0] = size[1] = 2 * field_size / resolution;
         size[2] = focal_len / resolution;
 }
 
-void CostCube::reinitialize(double focal_len,double field_size,double resolution){
-        focal_len = focal_len;
-        field_size = field_size;
-        resolution = resolution;
+void CostCube::reinitialize(double _focal_len,double _field_size,double _resolution,float _dst_filter_factor){
+        focal_len = _focal_len;
+        field_size = _field_size;
+        resolution = _resolution;
+        dst_filter_factor = _dst_filter_factor;
         size[0] = size[1] = 2 * field_size / resolution;
         size[2] = focal_len / resolution;
 }
@@ -181,9 +183,11 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
         map_prob = cv::Mat::zeros(3,size,CV_32FC1);
         dst_mat = cv::Mat::zeros(3,size,CV_32FC1);
         occupied_ind.clear();
-        if(map_points.size()==0)
+        if(map_points.size()==0){
+                cout << "no map points received!" << endl;
                 return map_prob;
-        processMapPts(map_points,true);
+        }
+        // processMapPts(map_points,true);
         for (int row = 0; row < size[0]; ++row)
 		for (int col = 0; col < size[1]; ++col)		
                         for (int hei = 0;hei < size[2]; ++ hei){
@@ -195,8 +199,8 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
                                         cout << "something wrong happen while calculating CostCube by Distance." << endl;
                                         return map_prob;
                                 }
-                                // map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
-                                map_prob.at<float>(row, col, hei) = dst; 
+                                map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
+                                // map_prob.at<float>(row, col, hei) = dst; 
                                 // cout << "dst: " <<  dst << " " << ",cost : " <<  computeCostByDistance(dst) << endl;
                         }
         return map_prob;
@@ -219,7 +223,7 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id){
                 dst_vec.push_back(resolution * sqrt(pow(occupied_ind[i][0]-pos_id[0],2)+pow(occupied_ind[i][1]-pos_id[1],2)+pow(occupied_ind[i][2]-pos_id[2],2)));
         }
         sort(dst_vec.begin(),dst_vec.end());        
-        float dst_thresh = (dst_vec.back() - dst_vec.front()) * occ_scale +dst_vec.front() ;
+        float dst_thresh = (dst_vec.back() - dst_vec.front()) * dst_filter_factor +dst_vec.front() ;
         // cout << occ_n << " " << dst_thresh << " "<<  dst_vec.back() << " " << dst_vec.front() << endl;
         float dst = 0.0;
         int i;
@@ -243,25 +247,33 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
         for(uint i=0;i<map_points.size();++i){
                 float dst = sqrt(pow(map_points[i].x - x , 2) + pow(map_points[i].y - y , 2) + pow(map_points[i].z-z , 2));
                 dst_vec.push_back(dst);
-                if(dst < 0){
-                        cout << "error occur when calculating obstacle distance. map_point: [" <<  map_points[i].x << "," <<  map_points[i].y << "," <<  map_points[i].z << "],cur_pos: [" << x << "," << y << "," << z << "]" << endl;
-                }
         }
         sort(dst_vec.begin(),dst_vec.end());
-        //test
-        for(vector<float>::iterator it=dst_vec.begin();it!=dst_vec.end()-1;++it){
-                if(*it>*(it+1)){
-                        cout << "sort func wrong! " << *it << " and " << *(it+1) << endl;
-                }
-                cout << *it << endl;
-        }
-        cout << endl;
-        float dst_thresh = (dst_vec.back() - dst_vec.front()) * occ_scale +dst_vec.front() ;
-        // cout << occ_n << " " << dst_thresh << " "<<  dst_vec.back() << " " << dst_vec.front() << endl;
-        float dst = 0.0;
-        int i;
-        for(i=0;dst_vec[i]<=dst_thresh;++i){
-                dst +=  dst_vec[i];
+
+        // float dst_thresh = (dst_vec.back() - dst_vec.front()) * dst_filter_factor +dst_vec.front() ;
+        // // cout << occ_n << " " << dst_thresh << " "<<  dst_vec.back() << " " << dst_vec.front() << endl;
+        // float dst = 0.0;
+        // int i;
+        // for(i=0;dst_vec[i]-dst_thresh>-0.001;++i){
+        //         dst +=  dst_vec[i];
+        //         if(dst<0){
+        //                 cout << "dst<0! dst_vec[i]:" << dst_vec[i] << endl;
+        //                 for(vector<float>::iterator it=dst_vec.begin();it!=dst_vec.end()-1;++it){
+        //                         cout << *it << endl;
+        //                 }
+        //                 cout << *(dst_vec.end()-1) << endl;
+        //                 cout << "dst_vec.back(): " <<  dst_vec.back() << endl;
+        //                 cout << "dst_vec.front(): " <<  dst_vec.front() << endl;
+        //                 cout << "dst_thresh: " <<  dst_thresh << endl;
+        //                 int nth;
+        //                 cin >> nth;
+        //         }
+        // }
+        int i=0;
+        float dst=0;
+        while(i<int(dst_vec.size()*dst_filter_factor)){
+                dst+=dst_vec[i];
+                ++i;
         }
         return dst/i;
 }
