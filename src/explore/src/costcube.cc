@@ -1,4 +1,5 @@
 #include "costcube.h"
+#include <queue>
 
 CostCube::CostCube(vector<double> input_vec){
         double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
@@ -215,17 +216,20 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
                 return map_prob;
         }
         // processMapPts(map_points,true);
-        map<int,pair<double,geometry_msgs::Point>> map_pts;
-        int i=0;
-        for(vector<geometry_msgs::Point>::iterator it=map_points.begin();it!=map_points.end();++it,++i){
-                map_pts.insert(make_pair(i,make_pair(it->z,*it)));
+        // map<int,pair<double,geometry_msgs::Point>> map_pts;
+        // int i=0;
+        map<double,geometry_msgs::Point> map_pts;//sort map_points by z coordinate.
+        for(vector<geometry_msgs::Point>::iterator it=map_points.begin();it!=map_points.end();++it){
+                map_pts.insert(make_pair(it->z,*it));
         }
         for (int row = 0; row < size[0]; ++row)
 		for (int col = 0; col < size[1]; ++col)
                         for (int hei = 0;hei < size[2]; ++ hei){
+                                RTime rt("Distance calculation with priority queue");
                                 // TODO : Maybe need normalization?
                                 // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei});
-                                float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_pts);
+                                float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_points);
+                                // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_pts);
                                 dst_mat.at<float>(row, col, hei) = dst;
                                 if(dst < 0){//something wrong happen,dont change map_prob
                                         cout << "something wrong happen while calculating CostCube by Distance." << endl;
@@ -271,7 +275,8 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
                 cout << "Wrong dim of voxel index has been input!";
                 return -1;
         }
-        vector<float> dst_vec;
+        // map<int,float> dst_map;
+        priority_queue<float, vector<float>, greater<float> > dst_queue;
         // vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
         vector<int> cam_posid{int(size[0]/2),int(size[1]/2),0};
         float x = (pos_id[0] -cam_posid[0]) * resolution;
@@ -279,9 +284,10 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
         float z = (pos_id[2] - cam_posid[2]) * resolution;
         for(uint i=0;i<map_points.size();++i){
                 float dst = sqrt(pow(map_points[i].x - x , 2) + pow(map_points[i].y - y , 2) + pow(map_points[i].z-z , 2));
-                dst_vec.push_back(dst);
+                // dst_map.insert(make_pair(i,dst));
+                dst_queue.push(dst);
         }
-        sort(dst_vec.begin(),dst_vec.end());
+        // sort(dst_map.begin(),dst_vec.end());
 
         // float dst_thresh = (dst_vec.back() - dst_vec.front()) * dst_filter_factor +dst_vec.front() ;
         // // cout << occ_n << " " << dst_thresh << " "<<  dst_vec.back() << " " << dst_vec.front() << endl;
@@ -304,9 +310,57 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
         // }
         int i=0;
         float dst=0;
-        while(i<int(dst_vec.size()*dst_filter_factor)){
-                dst+=dst_vec[i];
+        while(i<int(dst_queue.size()*dst_filter_factor)){
+                // dst+=dst_vec[i];
+                dst+=dst_queue.top();
                 ++i;
+                dst_queue.pop();
+        }
+        return dst/i;
+}
+
+float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,map<double,geometry_msgs::Point> map_pts){
+//Calculate average distance between current voxel and all map points in the field of view. 
+        if(pos_id.size()!=3){
+                cout << "Wrong dim of voxel index has been input!";
+                return -1;
+        }
+        // vector<float> dst_vec;
+        // vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+        vector<int> cam_posid{int(size[0]/2),int(size[1]/2),0};
+        float x = (pos_id[0] -cam_posid[0]) * resolution;
+        float y = (pos_id[1] - cam_posid[1]) * resolution;
+        float z = (pos_id[2] - cam_posid[2]) * resolution;
+
+        int step = int(map_pts.size()*dst_filter_factor);
+        // int search_id = step;
+        auto iter = find_if(map_pts.begin(),map_pts.end(),Nearest_MapValue(z));
+        if(iter == map_pts.end()){
+                cout << "cannot find nearby map point with [" << x << "," << y << "," << z << "]." << endl;
+        }
+        else{
+                int ind = distance(map_pts.begin(),iter);
+                // if(search_id<step){
+                //         iter = map_pts.begin();
+                //         advance(iter,step);
+                //         //search_id = step;
+                // }
+                if (ind > map_pts.size() - step){
+                        iter = map_pts.end();
+                        advance(iter,-step);
+                        // search_id = map_pts.size() - step;         
+                }
+                else{
+                        advance(iter,-step/2);
+                }
+        }
+        int i;float dst=0;
+        // for(i = search_id-step;i<search_id+step;++i){
+        for(i=0;i<step;++i,++iter){//calculate nearest points distance in z coordinate.
+                if(iter==map_pts.end()){
+                        cout << "sth wrong happen while calculating nearby obstacle distance." << endl;
+                }
+                dst += sqrt(pow((*iter).second.x- x , 2) + pow((*iter).second.y - y , 2) + pow((*iter).second.z-z , 2));
         }
         return dst/i;
 }
@@ -323,35 +377,4 @@ float CostCube::computeCostByDistance(const float distance)
         }
         // cout << "compute process : dst: " << distance << " cost: " <<  cost << endl;
         return cost;
-}
-
-float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,map<int,pair<double,geometry_msgs::Point>> map_pts){
-//Calculate average distance between current voxel and all map points in the field of view. 
-        if(pos_id.size()!=3){
-                cout << "Wrong dim of voxel index has been input!";
-                return -1;
-        }
-        // vector<float> dst_vec;
-        // vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
-        vector<int> cam_posid{int(size[0]/2),int(size[1]/2),0};
-        float x = (pos_id[0] -cam_posid[0]) * resolution;
-        float y = (pos_id[1] - cam_posid[1]) * resolution;
-        float z = (pos_id[2] - cam_posid[2]) * resolution;
-
-        int step = int(map_pts.size()*dst_filter_factor);
-        int search_id = step;
-        auto iter = find_if(map_pts.begin(),map_pts.end(),Nearest_MapValue(z));
-        if(iter == map_pts.end()){
-                cout << "cannot find nearby map point with [" << x << "," << y << "," << z << "]." << endl;
-        }
-        else{
-                search_id = distance(map_pts.begin(),iter);
-                if(search_id<step) search_id = step;
-                else if (search_id > map_pts.size() - step) search_id = map_pts.size() - step;                
-        }
-        int i;float dst=0;
-        for(i = search_id-step;i<search_id+step;++i){
-                dst += sqrt(pow(map_pts[i].second.x- x , 2) + pow(map_pts[i].second.y - y , 2) + pow(map_pts[i].second.z-z , 2));
-        }
-        return dst/i;
 }

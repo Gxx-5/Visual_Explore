@@ -48,8 +48,10 @@ public:
         bool Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
         float computeCostByDistance(const float distance);
         float dstFromVoxelToObstacle(vector<int> pos_id);
-	float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points);
-        float dstFromVoxelToObstacle(vector<int> pos_id,map<int,pair<double,geometry_msgs::Point>> map_pts);
+	float dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points);        
+        float dstFromVoxelToObstacle(vector<int> pos_id,map<double,geometry_msgs::Point> map_pts);
+	// float dstFromVoxelToObstacle(vector<int> pos_id,map<int,pair<double,geometry_msgs::Point>> map_pts);
+
 
 private:
         double shooting_dst = 0.5;// the farest distance camera can catch in world coordinate. default : 0.5
@@ -87,9 +89,10 @@ private:
 class Nearest_MapValue{
 public:
 	Nearest_MapValue(const float _digit):digit(_digit){}
-       bool operator ()(const map<int,pair<double,geometry_msgs::Point>>::value_type &pair)
+//        bool operator ()(const map<int,pair<double,geometry_msgs::Point>>::value_type &pair)
+       bool operator ()(const map<double,geometry_msgs::Point>::value_type &pair)
        {
-            return pair.second.first > digit;
+            return pair.first > digit;
        }
 private:
         const float digit;
