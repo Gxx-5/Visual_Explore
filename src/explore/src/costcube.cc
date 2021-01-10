@@ -1,23 +1,41 @@
 #include "costcube.h"
 
-CostCube::CostCube(double _focal_len,double _field_size,double _resolution,double _dst_filter_factor,double _cost_scaling_factor){
-        focal_len = _focal_len;
-        field_size = _field_size;
-        resolution = _resolution;
-        dst_filter_factor = _dst_filter_factor;
-        cost_scaling_factor = _cost_scaling_factor;
-        size[0] = size[1] = 2 * field_size / resolution;
-        size[2] = focal_len / resolution;
+CostCube::CostCube(vector<double> input_vec){
+        double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
+        for(int i=0;i<input_vec.size();++i){
+                *param[i]=input_vec[i];
+        }
+        size[0] = int(cam_width / resolution);
+        size[1] = int(cam_height / resolution);
+        size[2] = int(shooting_dst / resolution);
+        printParams();
 }
 
-void CostCube::reinitialize(double _focal_len,double _field_size,double _resolution,double _dst_filter_factor,double _cost_scaling_factor){
-        focal_len = _focal_len;
-        field_size = _field_size;
-        resolution = _resolution;
-        dst_filter_factor = _dst_filter_factor;
-        cost_scaling_factor = _cost_scaling_factor;
-        size[0] = size[1] = 2 * field_size / resolution;
-        size[2] = focal_len / resolution;
+void CostCube::reinitialize(vector<double> input_vec){
+        double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
+        for(int i=0;i<input_vec.size();++i){
+                *param[i]=input_vec[i];
+        }
+        size[0] = int(cam_width / resolution);
+        size[1] = int(cam_height / resolution);
+        size[2] = int(shooting_dst / resolution);
+        printParams();
+}
+
+void CostCube::printParams()
+{
+	printf("Using params:\n");
+	printf("shooting_dst: %4.2f\n", shooting_dst);
+	printf("cam_width: %4.2f\n", cam_width);
+        printf("cam_height: %4.2f\n", cam_height);
+	printf("resolution: %4.2f\n", resolution);
+        printf("dst_filter_factor: %4.2f\n", dst_filter_factor);
+        printf("cost_scaling_factor: %4.2f\n", cost_scaling_factor);
+        printf("size of costcube: [%d,%d,%d]\n", size[0],size[1],size[2]);
+}
+
+double CostCube::getresolution(){
+        return resolution;
 }
 
 cv::Mat CostCube::calCostCubeByBresenham3D(vector<geometry_msgs::Point> map_points){
@@ -67,7 +85,7 @@ void CostCube::processMapPts(const std::vector<geometry_msgs::Point> &pts,bool c
         for (unsigned int pt_id = 0; pt_id < pts.size(); ++pt_id)
         {
                 double dst = sqrt(pow((pts[pt_id].x),2)+pow((pts[pt_id].y),2)+pow((pts[pt_id].z),2));
-                if(dst > focal_len){
+                if(dst > shooting_dst){
                         continue;
                         distant_num++;
                 }
@@ -90,7 +108,7 @@ bool CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied
         // int x1 = int(size[0]/2);
         // int y1 = int(size[1]/2);
         // int z1 = 0;
-        vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+        vector<int> cam_posid{int(size[0]/2),int(size[1]/2),0};
         int x2 = int((pt_pos.x )/resolution + cam_posid[0]);
         int y2 = int((pt_pos.y )/resolution + cam_posid[1]);
         int z2 = int((pt_pos.z )/resolution  + cam_posid[2]);
@@ -242,7 +260,8 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
                 return -1;
         }
         vector<float> dst_vec;
-        vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+        // vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+        vector<int> cam_posid{int(size[0]/2),int(size[1]/2),0};
         float x = (pos_id[0] -cam_posid[0]) * resolution;
         float y = (pos_id[1] - cam_posid[1]) * resolution;
         float z = (pos_id[2] - cam_posid[2]) * resolution;

@@ -17,12 +17,13 @@
 
 using namespace std;
 
-// double filter_radius = 0.5;
-double focal_len = 1.0;
-double field_size = 0.25;
-double resolution = 0.1;
-double dst_filter_factor = 0.1;
-double cost_scaling_factor = 10.0;
+// double shooting_dst = 1.0;
+// double cam_width = 0.64;
+// double cam_height = 0.48;
+// double dst_filter_factor = 0.1;
+// double cost_scaling_factor = 10.0;
+double resolution;//resolution of CostCube
+vector<double> input_vec;//initial param of CostCube 
 std::string cloud_name = "/map_cloud";
 std::string pose_name = "/camera_pose";
 Eigen::Matrix3d Rwc;
@@ -55,7 +56,9 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	parseParams(argc, argv);
 	printParams();
-	CostCube COSTCUBE(focal_len,field_size,resolution,dst_filter_factor,cost_scaling_factor);
+	CostCube COSTCUBE(input_vec);	
+	// ros::param::get("resolution",resolution);
+	resolution = COSTCUBE.getresolution();
 
 	//Subscribe
 	ros::Subscriber pose_sub = n.subscribe(pose_name, 10, &poseStampedCallback);
@@ -184,61 +187,6 @@ vector<int> getColor(int value){
 	// return vector<int>{(int)(rStart+rStep*step+0.5),(int)(gStart+gStep*step+0.5),(int)(bStart+bStep*step+0.5)};
 }
 
-void testColorfunc(ros::Publisher vis_pub,ros::Publisher vis_text_pub){
-	float resolution = 10.0/255;
-	visualization_msgs::MarkerArray markerArr;
-	visualization_msgs::MarkerArray markerTextArr;
-	visualization_msgs::Marker marker;
-	visualization_msgs::Marker marker_text;
-	marker.header.frame_id = "camera_link";
-	marker.header.stamp = ros::Time::now();
-	marker.lifetime = ros::Duration();	
-	marker.type = visualization_msgs::Marker::CUBE;
-	marker.action = visualization_msgs::Marker::MODIFY;
-	marker.pose.orientation.x = 0.0;
-	marker.pose.orientation.y = 0.0;
-	marker.pose.orientation.z = 0.0;
-	marker.pose.orientation.w = 1.0;
-	marker.scale.x = resolution;
-	marker.scale.y = resolution;
-	marker.scale.z = resolution;
-	marker.color.a = 1.0; // Don't forget to set the alpha!
-	int marker_id = 0;
-
-	marker_text.header.frame_id = "camera_link";
-	marker_text.header.stamp = ros::Time::now();
-	marker_text.ns = "";
-	marker_text.lifetime = ros::Duration();	
-	marker_text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-	marker_text.action = visualization_msgs::Marker::MODIFY;
-	marker_text.pose.orientation.x = 0.0;
-	marker_text.pose.orientation.y = 0.0;
-	marker_text.pose.orientation.z = 0.0;
-	marker_text.pose.orientation.w = 1.0;
-	marker_text.scale.z = resolution;
-	marker_text.color.a = 1.0; // Don't forget to set the alpha!!
-
-	for(int i =0; i<255;++i){
-		marker.pose.position.x = -5.0+i*resolution;
-		marker.pose.position.y = 0;
-		marker.pose.position.z = 0;
-		vector<int> color  = getColor(i);
-		marker.color.r =  color[0];
-		marker.color.g = color[1];
-		marker.color.b = color[2];
-		marker.id = marker_id++;
-		markerArr.markers.push_back(marker);
-		marker_text.pose = marker.pose;
-		string str = to_string(i) + ", " + to_string(color[0]) + ", " +  to_string(color[1]) + ", " +  to_string(color[2]);
-		marker_text.text = str;//to_string(i);
-		marker_text.id = marker_id - 1;
-		markerTextArr.markers.push_back(marker_text);
-	}
-	vis_pub.publish(markerArr);
-	vis_text_pub.publish(markerTextArr);
-	cout << "test done." << endl;
-}
-
 void VisualizeCostCube(cv::Mat cost_map){
 	if(cost_map.empty()){
 		cout << "CostCube map is empty." << endl;
@@ -279,7 +227,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 	marker_text.scale.z = 0.3 * resolution;
 	marker_text.color.a = 1.0; // Don't forget to set the alpha!!
 
-	vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+	vector<int> cam_posid{int(cost_map.size[0] / 2),int(cost_map.size[1] / 2),0};
 	// cout << int(field_size / resolution) << " " << cost_map.size[0] << endl;
 	int marker_id = 0;
 	for (int row = 0; row < cost_map.size[0]; ++row){
@@ -368,7 +316,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 }
 
 void parseParams(int argc, char **argv)
-{	
+{
 	int arg_id = 1;
 	if (argc > arg_id)
 	{
@@ -378,35 +326,93 @@ void parseParams(int argc, char **argv)
 	{
 		pose_name = argv[arg_id++];
 	}
-	if (argc > arg_id)
-	{
-		focal_len = atof(argv[arg_id++]);
+	while(argc > arg_id){
+		input_vec.push_back(atof(argv[arg_id++]));
 	}
-	if (argc > arg_id)
-	{
-		field_size = atof(argv[arg_id++]);
-	}
-	if (argc > arg_id)
-	{
-		resolution = atof(argv[arg_id++]);
-	}
-	if (argc > arg_id)
-	{
-		dst_filter_factor = atof(argv[arg_id++]);
-	}
-	if (argc > arg_id)
-	{
-		cost_scaling_factor = atof(argv[arg_id++]);
-	}
+	// if (argc > arg_id)
+	// {
+	// 	shooting_dst = atof(argv[arg_id++]);
+	// }
+	// if (argc > arg_id)
+	// {
+	// 	field_size = atof(argv[arg_id++]);
+	// }
+	// if (argc > arg_id)
+	// {
+	// 	resolution = atof(argv[arg_id++]);
+	// }
+	// if (argc > arg_id)
+	// {
+	// 	dst_filter_factor = atof(argv[arg_id++]);
+	// }
+	// if (argc > arg_id)
+	// {
+	// 	cost_scaling_factor = atof(argv[arg_id++]);
+	// }
+
 }
 
 void printParams()
 {
-	printf("Using params:\n");
-	printf("focal_len: %f\n", focal_len);
-	printf("field_size: %f\n", field_size);
-	printf("resolution: %f\n", resolution);
+	// printf("Using params:\n");
+	// printf("shooting_dst: %f\n", shooting_dst);
+	// printf("field_size: %f\n", field_size);
+	// printf("resolution: %f\n", resolution);
 	printf("cloud_topic_name: %s\n", cloud_name.c_str());
 	printf("pose_topic_name: %s\n", pose_name.c_str());
 }
 
+void testColorfunc(ros::Publisher vis_pub,ros::Publisher vis_text_pub){
+	float resolution = 10.0/255;
+	visualization_msgs::MarkerArray markerArr;
+	visualization_msgs::MarkerArray markerTextArr;
+	visualization_msgs::Marker marker;
+	visualization_msgs::Marker marker_text;
+	marker.header.frame_id = "camera_link";
+	marker.header.stamp = ros::Time::now();
+	marker.lifetime = ros::Duration();	
+	marker.type = visualization_msgs::Marker::CUBE;
+	marker.action = visualization_msgs::Marker::MODIFY;
+	marker.pose.orientation.x = 0.0;
+	marker.pose.orientation.y = 0.0;
+	marker.pose.orientation.z = 0.0;
+	marker.pose.orientation.w = 1.0;
+	marker.scale.x = resolution;
+	marker.scale.y = resolution;
+	marker.scale.z = resolution;
+	marker.color.a = 1.0; // Don't forget to set the alpha!
+	int marker_id = 0;
+
+	marker_text.header.frame_id = "camera_link";
+	marker_text.header.stamp = ros::Time::now();
+	marker_text.ns = "";
+	marker_text.lifetime = ros::Duration();	
+	marker_text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+	marker_text.action = visualization_msgs::Marker::MODIFY;
+	marker_text.pose.orientation.x = 0.0;
+	marker_text.pose.orientation.y = 0.0;
+	marker_text.pose.orientation.z = 0.0;
+	marker_text.pose.orientation.w = 1.0;
+	marker_text.scale.z = resolution;
+	marker_text.color.a = 1.0; // Don't forget to set the alpha!!
+
+	for(int i =0; i<255;++i){
+		marker.pose.position.x = -5.0+i*resolution;
+		marker.pose.position.y = 0;
+		marker.pose.position.z = 0;
+		vector<int> color  = getColor(i);
+		marker.color.r =  color[0];
+		marker.color.g = color[1];
+		marker.color.b = color[2];
+		marker.id = marker_id++;
+		markerArr.markers.push_back(marker);
+		marker_text.pose = marker.pose;
+		string str = to_string(i) + ", " + to_string(color[0]) + ", " +  to_string(color[1]) + ", " +  to_string(color[2]);
+		marker_text.text = str;//to_string(i);
+		marker_text.id = marker_id - 1;
+		markerTextArr.markers.push_back(marker_text);
+	}
+	vis_pub.publish(markerArr);
+	vis_text_pub.publish(markerTextArr);
+	cout << "test done." << endl;
+}

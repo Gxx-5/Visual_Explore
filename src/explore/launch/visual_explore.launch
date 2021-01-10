@@ -7,14 +7,16 @@
   <node name="establishtf_node" pkg="establishtf"  type="establishtf_node" 
         args = "$(arg parent_frame) $(arg child_frame) $(arg pose_name)  $(arg rate)" output="screen"/>
 
-  <arg name="focal_len"  default="0.3"/>
-  <arg name="field_size" default="0.2"/>
+  <arg name="shooting_dst"  default="0.3"/>
+  <!-- <arg name="field_size" default="0.2"/> -->
+  <arg name="cam_width"  default="0.64"/>
+  <arg name="cam_height"  default="0.48"/>
   <arg name="resolution" default="0.01"/>
   <arg name="dst_filter_factor" default="0.1"/>
   <arg name="cost_scaling_factor" default="10.0"/>
   <arg name="cloud_name" default="/cur_kp_cloud"/>  <!--rostopic type : sensor_msgs::PointCloud-->
 
   <node name="explore_node" pkg="explore"  type="explore_node" 
-        args = "$(arg cloud_name) $(arg pose_name) $(arg focal_len) $(arg field_size) $(arg resolution) $(arg dst_filter_factor)  $(arg cost_scaling_factor)" output="screen"/>
+        args = "$(arg cloud_name) $(arg pose_name) $(arg shooting_dst) $(arg cam_width) $(arg cam_height) $(arg resolution) $(arg dst_filter_factor)  $(arg cost_scaling_factor)" output="screen"/>
 
 </launch>

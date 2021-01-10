@@ -30,17 +30,16 @@ obstacle cell
   }
 */
 
+//double _shooting_dst,double _cam_width,double _cam_height,double _resolution,double _dst_filter_factor = 0.1,double _cost_scaling_factor = 10.0
 class CostCube
 {
 public:
-        // typedef vector<vector<vector<float>>> Cube;
-        // typedef vector<vector<float>> cube_slice;
-        cv::Mat map_prob;
-        cv::Mat dst_mat;
-
-        CostCube(double _focal_len,double _field_size,double _resolution,double _dst_filter_factor = 0.1,double _cost_scaling_factor = 10.0);
+        CostCube(vector<double> input_vec);
         CostCube(){}
-        void reinitialize(double focal_len,double field_size,double resolution,double _dst_filter_factor = 0.1,double _cost_scaling_factor = 10.0);
+        void reinitialize(vector<double> input_vec);
+        void printParams();
+        
+        double getresolution();
         cv::Mat calCostCubeByBresenham3D(vector<geometry_msgs::Point> map_points);
         cv::Mat calCostCubeByDistance(vector<geometry_msgs::Point> map_points);
         void processMapPts(const std::vector<geometry_msgs::Point> &pts,bool cal_occupied_only=false);
@@ -50,13 +49,16 @@ public:
         float dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points);
 
 private:
-        double field_size = 0.15;
-        double focal_len = 0.5;
-        double resolution = 0.05;
-        double  dst_filter_factor;//the proportion to keep nearby points calculated by distance. default : 0.1
-        double cost_scaling_factor;//the weight of distance in cost calculation (same as costmap). default : 10.0
+        double shooting_dst = 0.5;// the farest distance camera can catch in world coordinate. default : 0.5
+        double cam_width = 0.64;//the width of camera field size. default : 0.64 if kinect
+        double cam_height = 0.48;//the height of camera field size. default : 0.48 if kinect        
+        double resolution = 0.05;// the resolution of costcube. default : 0.05
+        double  dst_filter_factor = 0.1;//the proportion to keep nearby points calculated by distance. default : 0.1
+        double cost_scaling_factor = 10.0;//the weight of distance in cost calculation (same as costmap). default : 10.0
         int size[3];
 
+        cv::Mat map_prob;
+        cv::Mat dst_mat;
         cv::Mat occupied_counter, visit_counter;
         vector<vector<int>> occupied_ind;
         int free_thresh = 5;
