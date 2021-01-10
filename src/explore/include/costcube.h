@@ -3,6 +3,8 @@
 #include "geometry_msgs/Point.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/viz.hpp>
+#include <ctime>
+#include <algorithm>
 
 using namespace std;
 
@@ -37,8 +39,8 @@ public:
         CostCube(vector<double> input_vec);
         CostCube(){}
         void reinitialize(vector<double> input_vec);
-        void printParams();
-        
+        void printParams();	
+	
         double getresolution();
         cv::Mat calCostCubeByBresenham3D(vector<geometry_msgs::Point> map_points);
         cv::Mat calCostCubeByDistance(vector<geometry_msgs::Point> map_points);
@@ -46,14 +48,15 @@ public:
         bool Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
         float computeCostByDistance(const float distance);
         float dstFromVoxelToObstacle(vector<int> pos_id);
-        float dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points);
+	float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points);
+        float dstFromVoxelToObstacle(vector<int> pos_id,map<int,pair<double,geometry_msgs::Point>> map_pts);
 
 private:
         double shooting_dst = 0.5;// the farest distance camera can catch in world coordinate. default : 0.5
         double cam_width = 0.64;//the width of camera field size. default : 0.64 if kinect
         double cam_height = 0.48;//the height of camera field size. default : 0.48 if kinect        
         double resolution = 0.05;// the resolution of costcube. default : 0.05
-        double  dst_filter_factor = 0.1;//the proportion to keep nearby points calculated by distance. default : 0.1
+        double dst_filter_factor = 1.0;//the proportion to keep nearby points calculated by distance. default : 0.1
         double cost_scaling_factor = 10.0;//the weight of distance in cost calculation (same as costmap). default : 10.0
         int size[3];
 
@@ -64,4 +67,30 @@ private:
         int free_thresh = 5;
         int occupied_thresh = 5;
         double inscribed_radius_ = 0.01;
+};
+
+class RTime{
+public:
+	RTime(string _func_name){
+		start = clock();
+		func_name = _func_name;
+	}
+	~RTime(){
+		end = clock();
+		cout << func_name <<  " has cost " << (double)(end-start)/CLOCKS_PER_SEC << "seconds" << endl;
+	}
+private:
+	clock_t start,end;
+	string func_name;	
+};
+
+class Nearest_MapValue{
+public:
+	Nearest_MapValue(const float _digit):digit(_digit){}
+       bool operator ()(const map<int,pair<double,geometry_msgs::Point>>::value_type &pair)
+       {
+            return pair.second.first > digit;
+       }
+private:
+        const float digit;
 };

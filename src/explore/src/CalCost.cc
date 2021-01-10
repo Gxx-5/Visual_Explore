@@ -32,9 +32,9 @@ Eigen::Vector3d Twc;
 vector<geometry_msgs::Point> map_points;//store map points within the field of vision
 
 //Publish
-ros::Publisher vis_pub,vis_text_pub,col_slice_text_pub,row_slice_text_pub;
+ros::Publisher vis_pub,vis_text_pub,horizontal_text_pub,vertical_text_pub;
 ros::Publisher costcloud_pub;
-ros::Publisher costcloud_colslice_pub,costcloud_rowslice_pub;
+ros::Publisher horizontal_cloud_pub,vertical_cloud_pub;
 ros::Publisher pt_pub;
 
 std::mutex mpt_mutex;
@@ -48,6 +48,14 @@ void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud);
 void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher publisher);
 void poseCallback(const geometry_msgs::PoseStamped &pose);
 void poseStampedCallback(const geometry_msgs::PoseStamped &pose);
+
+template <typename Func,typename Var,typename Ret>
+void getTime(Func func,Var var,Ret ret){
+        clock_t stime = clock();
+        ret = func(var);
+        clock_t etime = clock();
+        cout << "Time spent: " << (double)(etime-stime)/CLOCKS_PER_SEC << endl;
+}
 
 int main(int argc, char **argv)
 {
@@ -68,19 +76,28 @@ int main(int argc, char **argv)
 	pt_pub = n.advertise<sensor_msgs::PointCloud>("cam_pt_cloud",10);
 	vis_pub = n.advertise<visualization_msgs::MarkerArray>("costcube",10);
 	vis_text_pub = n.advertise<visualization_msgs::MarkerArray>("cost_text",10);
-	col_slice_text_pub = n.advertise<visualization_msgs::MarkerArray>("col_slice_text", 10);
-	row_slice_text_pub = n.advertise<visualization_msgs::MarkerArray>("row_slice_text", 10);
+	horizontal_text_pub = n.advertise<visualization_msgs::MarkerArray>("horizontal_text", 10);
+	vertical_text_pub = n.advertise<visualization_msgs::MarkerArray>("vertical_text", 10);
 	costcloud_pub = n.advertise<sensor_msgs::PointCloud>("costcloud", 10);
-	costcloud_colslice_pub = n.advertise<sensor_msgs::PointCloud>("col_slice_costcloud", 10);
-	costcloud_rowslice_pub = n.advertise<sensor_msgs::PointCloud>("row_slice_costcloud", 10);
+	horizontal_cloud_pub = n.advertise<sensor_msgs::PointCloud>("horizontal_costcloud", 10);
+	vertical_cloud_pub = n.advertise<sensor_msgs::PointCloud>("vertical_costcloud", 10);
 
-	ros::Rate loop_rate(10);
+	ros::Rate loop_rate(100);
 	while(ros::ok()){
 		{
+			ros::Time stime = ros::Time::now();
 			unique_lock<mutex> mlock(mpt_mutex);
 			PublishMapPoints(map_points,pt_pub);
-			cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
-			VisualizeCostCube(costcube_map);
+			{
+				RTime rtime("calCostCubeByDistance");
+				// ros::Time stime = ros::Time::now();
+				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
+				ros::Time etime = ros::Time::now();
+				// cout << "CalCostCube time spent : " << (etime - stime).toSec() << endl;
+				VisualizeCostCube(costcube_map);
+			}	
+			ros::Time etime = ros::Time::now();
+			cout << "Total time spent : " << (etime - stime).toSec() << endl << endl;
 		}
 		ros::spinOnce();
 		loop_rate.sleep();
@@ -194,8 +211,8 @@ void VisualizeCostCube(cv::Mat cost_map){
 	}
 	visualization_msgs::MarkerArray markerArr;
 	visualization_msgs::MarkerArray markerTextArr;
-	visualization_msgs::MarkerArray markerColSliceTextArr;
-	visualization_msgs::MarkerArray markerRowSliceTextArr;
+	visualization_msgs::MarkerArray markerHorizontalSliceTextArr;
+	visualization_msgs::MarkerArray markerVerticalSliceTextArr;
 
 	visualization_msgs::Marker marker;
 	marker.header.frame_id = "camera_link";
@@ -255,10 +272,10 @@ void VisualizeCostCube(cv::Mat cost_map){
 				marker_text.id = marker_id - 1;
 				markerTextArr.markers.push_back(marker_text);
 				if(col==cam_posid[1]){
-					markerColSliceTextArr.markers.push_back(marker_text);
+					markerHorizontalSliceTextArr.markers.push_back(marker_text);
 				}
 				if(row==cam_posid[0]){
-					markerRowSliceTextArr.markers.push_back(marker_text);
+					markerVerticalSliceTextArr.markers.push_back(marker_text);
 				}
 			}
 			// cout << endl;
@@ -268,8 +285,8 @@ void VisualizeCostCube(cv::Mat cost_map){
 	// cout << endl << endl;
 	vis_pub.publish(markerArr);
 	vis_text_pub.publish(markerTextArr);
-	col_slice_text_pub.publish(markerColSliceTextArr);
-	row_slice_text_pub.publish(markerRowSliceTextArr);
+	horizontal_text_pub.publish(markerHorizontalSliceTextArr);
+	vertical_text_pub.publish(markerVerticalSliceTextArr);
 
 	sensor_msgs::PointCloud cloud;
 	int pt_num = cost_map.size[0]*cost_map.size[1]*cost_map.size[2];
@@ -282,11 +299,14 @@ void VisualizeCostCube(cv::Mat cost_map){
     	cloud.channels[0].name = "intensities";
     	cloud.channels[0].values.resize(pt_num);
 
-	sensor_msgs::PointCloud col_slice_cloud = cloud;
-	int slice_pt_num = cost_map.size[1]*cost_map.size[2];
-	col_slice_cloud.points.resize(slice_pt_num);
-	col_slice_cloud.channels[0].values.resize(slice_pt_num);
-	sensor_msgs::PointCloud row_slice_cloud = col_slice_cloud;
+	sensor_msgs::PointCloud horizontal_cloud = cloud;
+	int slice_pt_num = cost_map.size[0]*cost_map.size[2];
+	horizontal_cloud.points.resize(slice_pt_num);
+	horizontal_cloud.channels[0].values.resize(slice_pt_num);
+	sensor_msgs::PointCloud vertical_cloud = cloud;
+	slice_pt_num = cost_map.size[1]*cost_map.size[2];
+	vertical_cloud.points.resize(slice_pt_num);
+	vertical_cloud.channels[0].values.resize(slice_pt_num);
 	//使用虚拟数据填充 PointCloud 消息．同时，使用虚拟数据填充 intensity 信道．
 	int i=0,j = 0,k=0;
     	for (int row = 0; row < cost_map.size[0]; ++row)
@@ -299,20 +319,20 @@ void VisualizeCostCube(cv::Mat cost_map){
 				cloud.channels[0].values[i] = int(cur_cost*100);				
 
 				if(col==cam_posid[1]){
-					col_slice_cloud.points[j] = cloud.points[i];
-					col_slice_cloud.channels[0].values[j] = cloud.channels[0].values[i];
+					horizontal_cloud.points[j] = cloud.points[i];
+					horizontal_cloud.channels[0].values[j] = cloud.channels[0].values[i];
 					j++;
 				}
 				if(row==cam_posid[0]){
-					row_slice_cloud.points[k] = cloud.points[i];
-					row_slice_cloud.channels[0].values[k] = cloud.channels[0].values[i];
+					vertical_cloud.points[k] = cloud.points[i];
+					vertical_cloud.channels[0].values[k] = cloud.channels[0].values[i];
 					k++;
 				}
 				i++;
     			}
     	costcloud_pub.publish(cloud);
-	costcloud_colslice_pub.publish(col_slice_cloud);
-	costcloud_rowslice_pub.publish(row_slice_cloud);
+	horizontal_cloud_pub.publish(horizontal_cloud);
+	vertical_cloud_pub.publish(vertical_cloud);
 }
 
 void parseParams(int argc, char **argv)

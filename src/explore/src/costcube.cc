@@ -199,6 +199,13 @@ bool CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied
         return true;
 }
 
+bool compare(const geometry_msgs::Point& p1,const geometry_msgs::Point& p2){
+        if(p1.z<p2.z)
+                return true;
+        else
+                return false;               
+}
+
 cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points){
         map_prob = cv::Mat::zeros(3,size,CV_32FC1);
         dst_mat = cv::Mat::zeros(3,size,CV_32FC1);
@@ -208,12 +215,17 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
                 return map_prob;
         }
         // processMapPts(map_points,true);
+        map<int,pair<double,geometry_msgs::Point>> map_pts;
+        int i=0;
+        for(vector<geometry_msgs::Point>::iterator it=map_points.begin();it!=map_points.end();++it,++i){
+                map_pts.insert(make_pair(i,make_pair(it->z,*it)));
+        }
         for (int row = 0; row < size[0]; ++row)
-		for (int col = 0; col < size[1]; ++col)		
+		for (int col = 0; col < size[1]; ++col)
                         for (int hei = 0;hei < size[2]; ++ hei){
                                 // TODO : Maybe need normalization?
                                 // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei});
-                                float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_points);
+                                float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_pts);
                                 dst_mat.at<float>(row, col, hei) = dst;
                                 if(dst < 0){//something wrong happen,dont change map_prob
                                         cout << "something wrong happen while calculating CostCube by Distance." << endl;
@@ -238,11 +250,11 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id){
         if(occ_n <= 0){
                 cout <<"No obstacle points detected when calculate distance from voxel to obstacle! return -1" << endl;
                 return -1;
-        }        
+        }
         for(uint i=0;i<occ_n;++i){
                 dst_vec.push_back(resolution * sqrt(pow(occupied_ind[i][0]-pos_id[0],2)+pow(occupied_ind[i][1]-pos_id[1],2)+pow(occupied_ind[i][2]-pos_id[2],2)));
         }
-        sort(dst_vec.begin(),dst_vec.end());        
+        sort(dst_vec.begin(),dst_vec.end());
         float dst_thresh = (dst_vec.back() - dst_vec.front()) * dst_filter_factor +dst_vec.front() ;
         // cout << occ_n << " " << dst_thresh << " "<<  dst_vec.back() << " " << dst_vec.front() << endl;
         float dst = 0.0;
@@ -311,4 +323,35 @@ float CostCube::computeCostByDistance(const float distance)
         }
         // cout << "compute process : dst: " << distance << " cost: " <<  cost << endl;
         return cost;
+}
+
+float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,map<int,pair<double,geometry_msgs::Point>> map_pts){
+//Calculate average distance between current voxel and all map points in the field of view. 
+        if(pos_id.size()!=3){
+                cout << "Wrong dim of voxel index has been input!";
+                return -1;
+        }
+        // vector<float> dst_vec;
+        // vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+        vector<int> cam_posid{int(size[0]/2),int(size[1]/2),0};
+        float x = (pos_id[0] -cam_posid[0]) * resolution;
+        float y = (pos_id[1] - cam_posid[1]) * resolution;
+        float z = (pos_id[2] - cam_posid[2]) * resolution;
+
+        int step = int(map_pts.size()*dst_filter_factor);
+        int search_id = step;
+        auto iter = find_if(map_pts.begin(),map_pts.end(),Nearest_MapValue(z));
+        if(iter == map_pts.end()){
+                cout << "cannot find nearby map point with [" << x << "," << y << "," << z << "]." << endl;
+        }
+        else{
+                search_id = distance(map_pts.begin(),iter);
+                if(search_id<step) search_id = step;
+                else if (search_id > map_pts.size() - step) search_id = map_pts.size() - step;                
+        }
+        int i;float dst=0;
+        for(i = search_id-step;i<search_id+step;++i){
+                dst += sqrt(pow(map_pts[i].second.x- x , 2) + pow(map_pts[i].second.y - y , 2) + pow(map_pts[i].second.z-z , 2));
+        }
+        return dst/i;
 }
