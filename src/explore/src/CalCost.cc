@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 			unique_lock<mutex> mlock(mpt_mutex);
 			PublishMapPoints(map_points,pt_pub);
 			{
-				RTime rtime("Main Program");
+				// RTime rtime("Main Program");
 				// ros::Time stime = ros::Time::now();
 				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
 				ros::Time etime = ros::Time::now();

@@ -45,6 +45,7 @@ ${catkin_INCLUDE_DIRS}
 add_executable(${PROJECT_NAME}_node 
 src/CalCost.cc
 src/costcube.cc
+src/KDTree.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}_node

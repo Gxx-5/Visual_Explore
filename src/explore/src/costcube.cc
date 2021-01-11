@@ -1,25 +1,29 @@
 #include "costcube.h"
 #include <queue>
 
+
 CostCube::CostCube(vector<double> input_vec){
-        double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
+        // double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
         for(int i=0;i<input_vec.size();++i){
                 *param[i]=input_vec[i];
         }
         size[0] = int(cam_width / resolution);
         size[1] = int(cam_height / resolution);
         size[2] = int(shooting_dst / resolution);
+        filter_triangle = getFilterTriangle();
+        cam_posid = {int(size[0]/2),int(size[1]/2),0};
         printParams();
 }
 
 void CostCube::reinitialize(vector<double> input_vec){
-        double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
+        // double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
         for(int i=0;i<input_vec.size();++i){
                 *param[i]=input_vec[i];
         }
         size[0] = int(cam_width / resolution);
         size[1] = int(cam_height / resolution);
         size[2] = int(shooting_dst / resolution);
+        filter_triangle = getFilterTriangle();
         printParams();
 }
 
@@ -33,6 +37,7 @@ void CostCube::printParams()
         printf("dst_filter_factor: %4.2f\n", dst_filter_factor);
         printf("cost_scaling_factor: %4.2f\n", cost_scaling_factor);
         printf("size of costcube: [%d,%d,%d]\n", size[0],size[1],size[2]);
+        printf("size of filter_triangle: [%d]\n", filter_triangle.size());
 }
 
 double CostCube::getresolution(){
@@ -216,20 +221,43 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
                 return map_prob;
         }
         // processMapPts(map_points,true);
-        // map<int,pair<double,geometry_msgs::Point>> map_pts;
-        // int i=0;
-        map<double,geometry_msgs::Point> map_pts;//sort map_points by z coordinate.
+
+        //calculate distance by map
+        // map<double,geometry_msgs::Point> map_pts;//sort map_points by z coordinate.
+        // for(vector<geometry_msgs::Point>::iterator it=map_points.begin();it!=map_points.end();++it){
+        //         map_pts.insert(make_pair(it->z,*it));
+        // }
+
+        //calculate distance by kdtree
+        // pointVec points;
+        // for(vector<geometry_msgs::Point>::iterator it=map_points.begin();it!=map_points.end();++it){
+        //         points.push_back(point_t{it->x,it->y,it->z});
+        // }
+        // KDTree tree(points);
+
+        //calculate distance by PCL::KDTree
+        //https://blog.csdn.net/qq_22170875/article/details/84786533?utm_medium=distribute.pc_relevant_t0.none-task-blog-OPENSEARCH-1.control&depth_1-utm_source=distribute.pc_relevant_t0.none-task-blog-OPENSEARCH-1.control
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;  //建立kdtree对象
         for(vector<geometry_msgs::Point>::iterator it=map_points.begin();it!=map_points.end();++it){
-                map_pts.insert(make_pair(it->z,*it));
+                cloud->push_back(pcl::PointXYZ(it->x, it->y, it->z));
         }
+	kdtree.setInputCloud(cloud); //设置需要建立kdtree的点云指针
+
         for (int row = 0; row < size[0]; ++row)
 		for (int col = 0; col < size[1]; ++col)
                         for (int hei = 0;hei < size[2]; ++ hei){
-                                RTime rt("Distance calculation with priority queue");
+                                if(hei < filter_triangle[row]){
+                                        map_prob.at<float>(row, col, hei) = 1.0;
+                                        continue;
+                                }
+                                // RTime rt("Distance calculation with priority queue");
                                 // TODO : Maybe need normalization?
                                 // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei});
-                                float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_points);
+                                // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_points);
                                 // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},map_pts);
+                                // float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},tree);
+                                float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},kdtree,int(kdtree_K));
                                 dst_mat.at<float>(row, col, hei) = dst;
                                 if(dst < 0){//something wrong happen,dont change map_prob
                                         cout << "something wrong happen while calculating CostCube by Distance." << endl;
@@ -282,11 +310,14 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
         float x = (pos_id[0] -cam_posid[0]) * resolution;
         float y = (pos_id[1] - cam_posid[1]) * resolution;
         float z = (pos_id[2] - cam_posid[2]) * resolution;
-        for(uint i=0;i<map_points.size();++i){
-                float dst = sqrt(pow(map_points[i].x - x , 2) + pow(map_points[i].y - y , 2) + pow(map_points[i].z-z , 2));
-                // dst_map.insert(make_pair(i,dst));
-                dst_queue.push(dst);
-        }
+        // {
+        //         RTime rt("dst_queue push");
+                for(uint i=0;i<map_points.size();++i){
+                        float dst = sqrt(pow(map_points[i].x - x , 2) + pow(map_points[i].y - y , 2) + pow(map_points[i].z-z , 2));
+                        // dst_map.insert(make_pair(i,dst));
+                        dst_queue.push(dst);
+                }
+        // }
         // sort(dst_map.begin(),dst_vec.end());
 
         // float dst_thresh = (dst_vec.back() - dst_vec.front()) * dst_filter_factor +dst_vec.front() ;
@@ -310,12 +341,15 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
         // }
         int i=0;
         float dst=0;
-        while(i<int(dst_queue.size()*dst_filter_factor)){
-                // dst+=dst_vec[i];
-                dst+=dst_queue.top();
-                ++i;
-                dst_queue.pop();
-        }
+        // {
+        //         RTime rt("dst_queue pop");
+                while(i<int(dst_queue.size()*dst_filter_factor)){
+                        // dst+=dst_vec[i];
+                        dst+=dst_queue.top();
+                        ++i;
+                        dst_queue.pop();
+                }
+        // }
         return dst/i;
 }
 
@@ -325,8 +359,6 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,map<double,geometry_ms
                 cout << "Wrong dim of voxel index has been input!";
                 return -1;
         }
-        // vector<float> dst_vec;
-        // vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
         vector<int> cam_posid{int(size[0]/2),int(size[1]/2),0};
         float x = (pos_id[0] -cam_posid[0]) * resolution;
         float y = (pos_id[1] - cam_posid[1]) * resolution;
@@ -350,6 +382,9 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,map<double,geometry_ms
                         advance(iter,-step);
                         // search_id = map_pts.size() - step;         
                 }
+                else if(ind < step/2){
+                        iter = map_pts.begin();                    
+                }
                 else{
                         advance(iter,-step/2);
                 }
@@ -358,9 +393,108 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,map<double,geometry_ms
         // for(i = search_id-step;i<search_id+step;++i){
         for(i=0;i<step;++i,++iter){//calculate nearest points distance in z coordinate.
                 if(iter==map_pts.end()){
-                        cout << "sth wrong happen while calculating nearby obstacle distance." << endl;
+                        cout << "sth wrong happen while calculating nearby obstacle distance. i= " << i << " step= " << step << endl;
                 }
                 dst += sqrt(pow((*iter).second.x- x , 2) + pow((*iter).second.y - y , 2) + pow((*iter).second.z-z , 2));
+        }
+        return dst/i;
+}
+
+float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,KDTree tree){
+        // RTime rt("kdtree");
+        if(pos_id.size()!=3){
+                cout << "Wrong dim of voxel index has been input!";
+                return -1;
+        }
+        double x = (pos_id[0] -cam_posid[0]) * resolution;
+        double y = (pos_id[1] - cam_posid[1]) * resolution;
+        double z = (pos_id[2] - cam_posid[2]) * resolution;
+        point_t pt{x,y,z};
+        auto ptVec = tree.neighborhood_points(pt,kdtree_radius);
+        if(ptVec.size()==0){
+                auto nearest_pt = tree.nearest_point(pt);
+                float dst = sqrt(pow(nearest_pt[0] - x , 2) + pow(nearest_pt[1] - y , 2) + pow(nearest_pt[2]-z , 2));
+                return dst;
+        }
+        float ave_dst = 0;
+        for (point_t pt : ptVec) {
+                float dst = sqrt(pow(pt[0] - x , 2) + pow(pt[1] - y , 2) + pow(pt[2]-z , 2));
+                ave_dst+=dst;
+        }
+        return ave_dst/ptVec.size();
+}
+
+float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,int K){
+        double x = (pos_id[0] -cam_posid[0]) * resolution;
+        double y = (pos_id[1] - cam_posid[1]) * resolution;
+        double z = (pos_id[2] - cam_posid[2]) * resolution;
+        pcl::PointXYZ searchPoint{x,y,z};
+        float dst=0;
+        if(K>0){
+                std::vector<int> pointIdxNKNSearch(K);  //保存每个近邻点的索引
+                std::vector<float> pointNKNSquaredDistance(K); //保存每个近邻点与查找点之间的欧式距离平方
+                kdtree.nearestKSearch(searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance);
+                for(vector<float>::iterator it=pointNKNSquaredDistance.begin();it!=pointNKNSquaredDistance.end();++it){
+                        dst+=*it;                        
+                }
+                return dst/K;
+        }
+        else{
+                std::vector<int> pointIdxRadiusSearch;  //保存每个近邻点的索引
+                std::vector<float> pointRadiusSquaredDistance;  //保存每个近邻点与查找点之间的欧式距离平方
+                kdtree.radiusSearch(searchPoint, kdtree_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+                int count=0;
+                for(vector<float>::iterator it=pointRadiusSquaredDistance.begin();it!=pointRadiusSquaredDistance.end();++it){
+                        dst+=*it;
+                        count++;
+                }
+                return dst/count;
+        }
+}
+
+
+float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points,int tag){
+//Calculate average distance between current voxel and all map points in the field of view. 
+        if(pos_id.size()!=3){
+                cout << "Wrong dim of voxel index has been input!";
+                return -1;
+        }
+        vector<float> dst_vec;
+        // vector<int> cam_posid{int(field_size / resolution),int(field_size / resolution),0};
+        vector<int> cam_posid{int(size[0]/2),int(size[1]/2),0};
+        float x = (pos_id[0] -cam_posid[0]) * resolution;
+        float y = (pos_id[1] - cam_posid[1]) * resolution;
+        float z = (pos_id[2] - cam_posid[2]) * resolution;
+        for(uint i=0;i<map_points.size();++i){
+                float dst = sqrt(pow(map_points[i].x - x , 2) + pow(map_points[i].y - y , 2) + pow(map_points[i].z-z , 2));
+                dst_vec.push_back(dst);
+        }
+        sort(dst_vec.begin(),dst_vec.end());
+
+        // float dst_thresh = (dst_vec.back() - dst_vec.front()) * dst_filter_factor +dst_vec.front() ;
+        // // cout << occ_n << " " << dst_thresh << " "<<  dst_vec.back() << " " << dst_vec.front() << endl;
+        // float dst = 0.0;
+        // int i;
+        // for(i=0;dst_vec[i]-dst_thresh>-0.001;++i){
+        //         dst +=  dst_vec[i];
+        //         if(dst<0){
+        //                 cout << "dst<0! dst_vec[i]:" << dst_vec[i] << endl;c
+        //                 for(vector<float>::iterator it=dst_vec.begin();it!=dst_vec.end()-1;++it){
+        //                         cout << *it << endl;
+        //                 }
+        //                 cout << *(dst_vec.end()-1) << endl;
+        //                 cout << "dst_vec.back(): " <<  dst_vec.back() << endl;
+        //                 cout << "dst_vec.front(): " <<  dst_vec.front() << endl;
+        //                 cout << "dst_thresh: " <<  dst_thresh << endl;
+        //                 int nth;
+        //                 cin >> nth;
+        //         }
+        // }
+        int i=0;
+        float dst=0;
+        while(i<int(dst_vec.size()*dst_filter_factor)){
+                dst+=dst_vec[i];
+                ++i;
         }
         return dst/i;
 }
@@ -377,4 +511,54 @@ float CostCube::computeCostByDistance(const float distance)
         }
         // cout << "compute process : dst: " << distance << " cost: " <<  cost << endl;
         return cost;
+}
+
+map<int,int> Bresenham2D(int x0,int y0,int x1,int y1){
+	int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+	int dy = abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+	int err = (dx > dy ? dx : -dy) / 2, e2;
+        map<int,int> triangle;
+        triangle[x0]=y0;
+        while(x0 != x1 && y0 != y1){
+		e2 = err;
+		if (e2 > -dx)
+		{
+			err -= dy;
+			x0 += sx;
+		}
+		if (e2 < dy)
+		{
+			err += dx;
+			y0 += sy;
+		}
+                triangle[x0]=y0;
+                // cout << "x,y: " << x0 << "," << y0 << endl;
+	}
+        return triangle;
+}
+
+map<int,int> CostCube::getFilterTriangle(){
+        int x0 = 0;
+	int y0 = int(trapezoid_hei / resolution);
+	int x1 = int((cam_width-trapezoid_len)/2/resolution)-1;
+	int y1 = 0;
+        map<int,int> triangle1 = Bresenham2D(x0,y0,x1,y1);
+        for(int i=0;i<int(trapezoid_len/resolution);++i){
+                triangle1[x1+i] = 0;
+        }
+
+        x0 =  int((cam_width+trapezoid_len)/2/resolution)-1;
+	y0 = 0;
+	x1 = int(cam_width/resolution)-1;
+	y1 = int(trapezoid_hei / resolution);
+        map<int,int> triangle2 = Bresenham2D(x0,y0,x1,y1);
+
+        triangle1.insert(triangle2.begin(),triangle2.end());
+        if(triangle1.size()!=int(cam_width/resolution)){
+                cout << "Actual triangle size: " << triangle1.size() << " Expected triangle size: " << int(cam_width/resolution) << endl;
+                // for(map<int,int>::iterator it=triangle1.begin();it!=triangle1.end();++it){
+                //         cout << it->first << " " << it->second << endl;
+                // }
+        }       
+        return triangle1;
 }
