@@ -248,7 +248,7 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
 		for (int col = 0; col < size[1]; ++col)
                         for (int hei = 0;hei < size[2]; ++ hei){
                                 if(hei < filter_triangle[row]){
-                                        map_prob.at<float>(row, col, hei) = 1.0;
+                                        map_prob.at<float>(row, col, hei) = 0.0;
                                         continue;
                                 }
                                 // RTime rt("Distance calculation with priority queue");
@@ -263,8 +263,8 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
                                         cout << "something wrong happen while calculating CostCube by Distance." << endl;
                                         return map_prob;
                                 }
-                                map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
-                                // map_prob.at<float>(row, col, hei) = dst; 
+                                // map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
+                                map_prob.at<float>(row, col, hei) = dst; 
                                 // cout << "dst: " <<  dst << " " << ",cost : " <<  computeCostByDistance(dst) << endl;
                         }
         return map_prob;
@@ -424,13 +424,14 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,KDTree tree){
         return ave_dst/ptVec.size();
 }
 
-float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,int K){
+float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,int K){        
         double x = (pos_id[0] -cam_posid[0]) * resolution;
         double y = (pos_id[1] - cam_posid[1]) * resolution;
         double z = (pos_id[2] - cam_posid[2]) * resolution;
         pcl::PointXYZ searchPoint{x,y,z};
         float dst=0;
         if(K>0){
+                cout << "Search KDTree by points num." << endl;
                 std::vector<int> pointIdxNKNSearch(K);  //保存每个近邻点的索引
                 std::vector<float> pointNKNSquaredDistance(K); //保存每个近邻点与查找点之间的欧式距离平方
                 kdtree.nearestKSearch(searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance);
@@ -440,12 +441,14 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,pcl::KdTreeFLANN<pcl::
                 return dst/K;
         }
         else{
+                cout << "Search KDTree by distance." << endl;
                 std::vector<int> pointIdxRadiusSearch;  //保存每个近邻点的索引
                 std::vector<float> pointRadiusSquaredDistance;  //保存每个近邻点与查找点之间的欧式距离平方
                 kdtree.radiusSearch(searchPoint, kdtree_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
                 int count=0;
                 for(vector<float>::iterator it=pointRadiusSquaredDistance.begin();it!=pointRadiusSquaredDistance.end();++it){
-                        dst+=*it;
+                        cout << "sqrt(*it): " << sqrt(*it) << endl; 
+                        dst+=sqrt(*it);
                         count++;
                 }
                 return dst/count;

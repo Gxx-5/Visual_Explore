@@ -3,6 +3,7 @@
 #include <vector>
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/PoseArray.h"
+#include "geometry_msgs/Twist.h"
 #include "visualization_msgs/MarkerArray.h"
 #include "visualization_msgs/Marker.h"
 #include <pcl/point_cloud.h>
@@ -24,6 +25,8 @@ using namespace std;
 // double cost_scaling_factor = 10.0;
 double resolution;//resolution of CostCube
 vector<double> input_vec;//initial param of CostCube 
+double obs_cost;
+int obs_count;
 std::string cloud_name = "/map_cloud";
 std::string pose_name = "/camera_pose";
 Eigen::Matrix3d Rwc;
@@ -48,6 +51,7 @@ void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud);
 void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher publisher);
 void poseCallback(const geometry_msgs::PoseStamped &pose);
 void poseStampedCallback(const geometry_msgs::PoseStamped &pose);
+bool detectObstacle(cv::Mat cost_map);
 
 template <typename Func,typename Var,typename Ret>
 void getTime(Func func,Var var,Ret ret){
@@ -81,6 +85,7 @@ int main(int argc, char **argv)
 	costcloud_pub = n.advertise<sensor_msgs::PointCloud>("costcloud", 10);
 	horizontal_cloud_pub = n.advertise<sensor_msgs::PointCloud>("horizontal_costcloud", 10);
 	vertical_cloud_pub = n.advertise<sensor_msgs::PointCloud>("vertical_costcloud", 10);
+	ros::Publisher vel_pub= n.advertise<geometry_msgs::Twist>("cmd_vel",1,true);
 
 	ros::Rate loop_rate(100);
 	while(ros::ok()){
@@ -92,8 +97,19 @@ int main(int argc, char **argv)
 				// RTime rtime("Main Program");
 				// ros::Time stime = ros::Time::now();
 				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
-				ros::Time etime = ros::Time::now();
+				// ros::Time etime = ros::Time::now();				
 				// cout << "CalCostCube time spent : " << (etime - stime).toSec() << endl;
+				if(detectObstacle(costcube_map)){
+					cout << "Detected obstacle ahead!!!! Stop automatically." << endl;
+					geometry_msgs::Twist twist;
+					twist.linear.x=0;
+					twist.linear.y=0;
+					twist.linear.z=0;
+					twist.angular.x=0;
+					twist.angular.y=0;
+					twist.angular.z=0;
+					vel_pub.publish(twist);
+				}
 				VisualizeCostCube(costcube_map);
 			}	
 			ros::Time etime = ros::Time::now();
@@ -103,6 +119,24 @@ int main(int argc, char **argv)
 		loop_rate.sleep();
 	}
 	return 1;
+}
+
+bool detectObstacle(cv::Mat cost_map){
+	int count = 0;
+	for (int row = 0; row < cost_map.size[0]; ++row)
+		for (int col = 0; col < cost_map.size[1]; ++col)
+                        for (int hei = 0;hei < cost_map.size[2]; ++ hei){
+				float cur_cost = cost_map.at<float>(row, col, hei);
+				if(cur_cost > obs_cost){
+					count ++;
+				}
+			}
+	if(count>obs_count){
+		return true;
+	}
+	else{
+		return false;
+	}
 }
 
 void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud){	
@@ -345,6 +379,14 @@ void parseParams(int argc, char **argv)
 	if (argc > arg_id)
 	{
 		pose_name = argv[arg_id++];
+	}
+	if (argc > arg_id)
+	{
+		obs_count = atoi(argv[arg_id++]);
+	}
+	if (argc > arg_id)
+	{
+		obs_cost = atof(argv[arg_id++]);
 	}
 	while(argc > arg_id){
 		input_vec.push_back(atof(argv[arg_id++]));
