@@ -71,6 +71,7 @@ int main(int argc, char **argv)
 	CostCube COSTCUBE(input_vec);	
 	// ros::param::get("resolution",resolution);
 	resolution = COSTCUBE.getresolution();
+	
 
 	//Subscribe
 	ros::Subscriber pose_sub = n.subscribe(pose_name, 10, &poseStampedCallback);
@@ -123,14 +124,19 @@ int main(int argc, char **argv)
 
 bool detectObstacle(cv::Mat cost_map){
 	int count = 0;
+	float max_cost=0;
 	for (int row = 0; row < cost_map.size[0]; ++row)
 		for (int col = 0; col < cost_map.size[1]; ++col)
                         for (int hei = 0;hei < cost_map.size[2]; ++ hei){
 				float cur_cost = cost_map.at<float>(row, col, hei);
+				if(cur_cost>max_cost){
+					max_cost=cur_cost;
+				}
 				if(cur_cost > obs_cost){
 					count ++;
 				}
 			}
+	cout << "obs count : " << count << " max_cost : " << max_cost  <<  ", threshold count : "  << obs_count << endl;
 	if(count>obs_count){
 		return true;
 	}
