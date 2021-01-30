@@ -1,7 +1,7 @@
 <launch>
   <arg name="parent_frame"  default="/map"/>
   <arg name="child_frame" default="/camera_link"/>
-  <arg name="pose_name" default="/cur_camera_pose"/> <!--rostopic type : geometry_msgs::PoseStamped-->
+  <arg name="pose_name" default="/orb_slam2_rgbd/pose"/> <!--/cur_camera_pose--><!--rostopic type : geometry_msgs::PoseStamped-->
   <arg name="rate" default="100"/>
 
   <node name="establishtf_node" pkg="establishtf"  type="establishtf_node" 
