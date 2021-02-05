@@ -1,0 +1,16 @@
+%YAML:1.0
+# There are the params which will be loaded by explore node.
+# cloud_name: /cur_kp_cloud # rostopic type : sensor_msgs::PointCloud
+# obs_count: 10
+# obs_cost: 0.6
+shooting_dst: 0.15
+cam_width: 0.06
+cam_height: 0.005
+resolution: 0.005
+kdtree_radius: 0.3
+kdtree_K: 0
+cost_scaling_factor: 8.0
+trapezoid_hei: 0.0
+trapezoid_len: 0.0
+dst_filter_factor: 0.1
+

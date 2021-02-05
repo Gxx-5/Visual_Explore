@@ -1,27 +1,32 @@
 <launch>
-  <arg name="parent_frame"  default="/map"/>
-  <arg name="child_frame" default="/camera_link"/>
-  <arg name="pose_name" default="/orb_slam2_rgbd/pose"/> <!--/cur_camera_pose--><!--rostopic type : geometry_msgs::PoseStamped-->
-  <arg name="rate" default="100"/>
+	<arg name="parent_frame"  default="/map"/>
+	<arg name="child_frame" default="/camera_link"/>
+	<arg name="pose_name" default="/orb_slam2_rgbd/pose"/> <!--/cur_camera_pose--><!--rostopic type : geometry_msgs::PoseStamped-->
+	<arg name="rate" default="100"/>
 
-  <node name="establishtf_node" pkg="establishtf"  type="establishtf_node" 
-        args = "$(arg parent_frame) $(arg child_frame) $(arg pose_name)  $(arg rate)" output="screen"/>
+	<node name="establishtf_node" pkg="establishtf"  type="establishtf_node"
+		args = "$(arg parent_frame) $(arg child_frame) $(arg pose_name)  $(arg rate)" output="screen"/>
 
-  <arg name="cloud_name" default="/cur_kp_cloud"/>  <!--rostopic type : sensor_msgs::PointCloud-->
-  <arg name="obs_count"  default="10"/>
-  <arg name="obs_cost"  default="0.6"/>
-  <arg name="shooting_dst"  default="0.15"/>
-  <arg name="cam_width"  default="0.06"/>
-  <arg name="cam_height"  default="0.005"/>
-  <arg name="resolution" default="0.005"/>
-  <arg name="kdtree_radius" default="0.3"/>
-  <arg name="kdtree_K" default="0"/>
-  <arg name="cost_scaling_factor" default="8.0"/>
-  <arg name="trapezoid_hei" default="0.0"/>
-  <arg name="trapezoid_len" default="0.0"/>
-  <arg name="dst_filter_factor" default="0.1"/>
+	<arg name="cloud_name" default="/cur_kp_cloud"/>  <!--rostopic type : sensor_msgs::PointCloud-->
+	<arg name="obs_count"  default="10"/>
+	<arg name="obs_cost"  default="0.6"/>
+	<!-- <arg name="shooting_dst"  default="0.15"/>
+	<arg name="cam_width"  default="0.06"/>
+	<arg name="cam_height"  default="0.005"/>
+	<arg name="resolution" default="0.005"/>
+	<arg name="kdtree_radius" default="0.3"/>
+	<arg name="kdtree_K" default="0"/>
+	<arg name="cost_scaling_factor" default="8.0"/>
+	<arg name="trapezoid_hei" default="0.0"/>
+	<arg name="trapezoid_len" default="0.0"/>
+	<arg name="dst_filter_factor" default="0.1"/> -->
 
-  <node name="explore_node" pkg="explore"  type="explore_node" 
-        args = "$(arg cloud_name) $(arg pose_name) $(arg obs_count) $(arg obs_cost) $(arg shooting_dst) $(arg cam_width) $(arg cam_height) $(arg resolution) 
-        $(arg kdtree_radius) $(arg kdtree_K)  $(arg cost_scaling_factor) $(arg trapezoid_hei) $(arg trapezoid_len)  $(arg dst_filter_factor)" output="screen"/>
+	<!-- <node name="explore_node" pkg="explore"  type="explore_node"
+		args = "$(arg cloud_name) $(arg pose_name) $(arg obs_count) $(arg obs_cost) $(arg shooting_dst) $(arg cam_width) $(arg cam_height) $(arg resolution)
+		$(arg kdtree_radius) $(arg kdtree_K)  $(arg cost_scaling_factor) $(arg trapezoid_hei) $(arg trapezoid_len)  $(arg dst_filter_factor)" output="screen"> -->
+	<node name="explore_node" pkg="explore"  type="explore_node" args = "$(arg cloud_name) $(arg pose_name) $(arg obs_count) $(arg obs_cost)" output="screen">
+		<param name="params_path" value="$(find explore)/config/params.yaml"/>
+		<!-- <rosparam file="$(find explore)/config/params.yaml" command="load"/> -->
+	</node>
+
 </launch>
