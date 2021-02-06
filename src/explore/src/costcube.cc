@@ -1,6 +1,5 @@
-#include "costcube.h"
 #include <queue>
-
+#include "costcube.h"
 
 CostCube::CostCube(vector<double> input_vec){
 	// double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};

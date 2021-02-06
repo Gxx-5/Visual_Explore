@@ -6,6 +6,7 @@
 #include <ctime>
 #include <algorithm>
 #include "KDTree.hpp"
+#include "pcl/kdtree/kdtree_flann.h"
 #include <pcl/kdtree/kdtree_flann.h>  //kdtree近邻搜索
 #include "pcl/search/impl/organized.hpp"
 #include "pcl/surface/impl/convex_hull.hpp"
