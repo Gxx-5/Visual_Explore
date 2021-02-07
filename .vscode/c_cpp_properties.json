@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "browse": {
+                "databaseFilename": "",
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "includePath": [
+                "/opt/ros/melodic/include",
+                "/usr/include",
+                "/home/onepiece/GZX/Visual_Explore/src/explore/include",
+                "/usr/include/pcl-1.8/",
+                "/usr/include/eigen3/",
+                "/usr/include/vtk-6.3/"                
+            ],
+            "name": "Linux",
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/lib/ccache/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++14"
+        }
+    ],
+    "version": 4
+}
