@@ -1,15 +1,15 @@
 <launch>
 	<arg name="parent_frame"  default="/map"/>
 	<arg name="child_frame" default="/camera_link"/>
-	<arg name="pose_name" default="/orb_slam2_rgbd/pose"/> <!--/cur_camera_pose--><!--rostopic type : geometry_msgs::PoseStamped-->
+	<arg name="pose_name" default="/cur_camera_pose"/> <!--rostopic type : geometry_msgs::PoseStamped-->
 	<arg name="rate" default="100"/>
+	<arg name="cloud_name" default="/cur_kp_cloud"/>  <!--rostopic type : sensor_msgs::PointCloud-->
+	<arg name="obs_count"  default="10"/>
+	<arg name="obs_cost"  default="0.6"/>
 
 	<node name="establishtf_node" pkg="establishtf"  type="establishtf_node"
 		args = "$(arg parent_frame) $(arg child_frame) $(arg pose_name)  $(arg rate)" output="screen"/>
 
-	<arg name="cloud_name" default="/cur_kp_cloud"/>  <!--rostopic type : sensor_msgs::PointCloud-->
-	<arg name="obs_count"  default="10"/>
-	<arg name="obs_cost"  default="0.6"/>
 	<!-- <arg name="shooting_dst"  default="0.15"/>
 	<arg name="cam_width"  default="0.06"/>
 	<arg name="cam_height"  default="0.005"/>
