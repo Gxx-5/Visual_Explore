@@ -8,10 +8,11 @@
             "includePath": [
                 "/opt/ros/melodic/include",
                 "/usr/include",
-                "/home/onepiece/GZX/Visual_Explore/src/explore/include",
+               "/home/gxx/WorkSpace/Visual_Explore_ws/src/explore/include",
+                // "/home/wor/GZX/Visual_Explore/src/explore/include",
                 "/usr/include/pcl-1.8/",
                 "/usr/include/eigen3/",
-                "/usr/include/vtk-6.3/"                
+                "/usr/include/vtk-6.3/"
             ],
             "name": "Linux",
             "intelliSenseMode": "gcc-x64",
