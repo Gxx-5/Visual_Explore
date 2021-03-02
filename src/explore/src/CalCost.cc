@@ -11,6 +11,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include "sensor_msgs/PointCloud2.h"
 #include "sensor_msgs/PointCloud.h"
+#include <sensor_msgs/point_cloud_conversion.h>
 #include <Eigen/Eigen>
 #include <opencv2/core/core.hpp>
 #include "costcube.h"
@@ -48,6 +49,7 @@ void testColorfunc();
 void parseParams(int argc, char **argv);
 void printParams();
 void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud);
+void preProcess2(const sensor_msgs::PointCloud2::ConstPtr& pt_cloud);
 void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher publisher);
 void poseCallback(const geometry_msgs::PoseStamped &pose);
 void poseStampedCallback(const geometry_msgs::PoseStamped &pose);
@@ -73,13 +75,18 @@ int main(int argc, char **argv)
 	n.getParam("/explore_node/params_path",params_path);
 	CostCube COSTCUBE(params_path);
 
-	// ros::param::get("resolution",resolution);
+	// initialize
 	resolution = COSTCUBE.getresolution();
-	
+	Eigen::Quaterniond quat(0,0,0,1);
+	Rwc = quat.toRotationMatrix();
+	Twc(0,0) = Twc(1,0) = Twc(2,0) = 0;
+
 	//Subscribe
 	ros::Subscriber pose_sub = n.subscribe(pose_name, 10, &poseStampedCallback);
 	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,boost::bind(&preProcess,_1,map_points));
-	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,&preProcess);
+	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,&preProcess);
+	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud2>(cloud_name,1,&preProcess2);
+
 	//Publish
 	pt_pub = n.advertise<sensor_msgs::PointCloud>("cam_pt_cloud",10);
 	vis_pub = n.advertise<visualization_msgs::MarkerArray>("costcube",10);
@@ -115,7 +122,7 @@ int main(int argc, char **argv)
 					vel_pub.publish(twist);
 				}
 				VisualizeCostCube(costcube_map);
-			}	
+			}
 			ros::Time etime = ros::Time::now();
 			cout << "Total time spent : " << (etime - stime).toSec() << endl << endl;
 		}
@@ -162,6 +169,24 @@ void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud){
 		map_points.push_back(point);
 	}
 	// cout << map_points.size() << endl;
+}
+
+void preProcess2(const sensor_msgs::PointCloud2::ConstPtr& pt_cloud2){	
+	unique_lock<mutex> mlock(mpt_mutex);
+	unique_lock<mutex> plock(pose_mutex);
+	map_points.clear();
+	sensor_msgs::PointCloud::Ptr pt_cloud(new sensor_msgs::PointCloud);
+	sensor_msgs::convertPointCloud2ToPointCloud(*pt_cloud2, *pt_cloud);
+	for(int i=0;i<pt_cloud->points.size();++i){
+		geometry_msgs::Point point;
+		Eigen::Vector3d pos(pt_cloud->points[i].x,pt_cloud->points[i].y,pt_cloud->points[i].z);
+		pos = Rwc.inverse()*(pos - Twc);
+		point.x = pos(0,0);
+		point.y = pos(1,0);
+		point.z = pos(2,0);
+		map_points.push_back(point);
+	}
+	cout << "map_points.size: " << map_points.size() << endl;
 }
 
 void poseCallback(const geometry_msgs::Pose &pose){
