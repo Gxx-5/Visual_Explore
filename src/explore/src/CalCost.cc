@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 
 	//Publish
 	// pt_pub = n.advertise<sensor_msgs::PointCloud>("pt_cloud",10);
-	vis_pub = n.advertise<visualization_msgs::MarkerArray>("costcube",10);
+	// vis_pub = n.advertise<visualization_msgs::MarkerArray>("costcube",10);
 	vis_text_pub = n.advertise<visualization_msgs::MarkerArray>("cost_text",10);
 	horizontal_text_pub = n.advertise<visualization_msgs::MarkerArray>("horizontal_text", 10);
 	vertical_text_pub = n.advertise<visualization_msgs::MarkerArray>("vertical_text", 10);
@@ -294,11 +294,11 @@ void VisualizeCostCube(cv::Mat cost_map){
 		cout << "CostCube map is empty." << endl;
 		return;
 	}
-	visualization_msgs::MarkerArray markerArr;
+	// visualization_msgs::MarkerArray markerArr;
 	visualization_msgs::MarkerArray markerTextArr;
 	visualization_msgs::MarkerArray markerHorizontalSliceTextArr;
 	visualization_msgs::MarkerArray markerVerticalSliceTextArr;
-
+/*
 	visualization_msgs::Marker marker;
 	marker.header.frame_id = "map";
 	marker.header.stamp = ros::Time::now();
@@ -314,7 +314,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 	marker.scale.y = 0.8 * resolution;
 	marker.scale.z = 0.8 * resolution;
 	marker.color.a = 0.1; // Don't forget to set the alpha!
-	
+*/
 	visualization_msgs::Marker marker_text;
 	marker_text.header.frame_id = "map";
 	marker_text.header.stamp = ros::Time::now();
@@ -341,7 +341,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 	cloud.channels[0].values.resize(pt_num);
 
 	sensor_msgs::PointCloud horizontal_cloud = cloud;
-	int slice_pt_num = cost_map.size[0]*cost_map.size[1];
+	int slice_pt_num = cost_map.size[0]*cost_map.size[2];
 	horizontal_cloud.points.resize(slice_pt_num);
 	horizontal_cloud.channels[0].values.resize(slice_pt_num);
 	sensor_msgs::PointCloud vertical_cloud = cloud;
@@ -353,38 +353,33 @@ void VisualizeCostCube(cv::Mat cost_map){
 	// vector<int> cam_posid = {0,int(cost_map.size[1] / 2),int(cost_map.size[2] / 2)};
 	// cout << int(field_size / resolution) << " " << cost_map.size[0] << endl;
 	int marker_id = 0;
-	int i=0,j = 0,k=0;
+	int i=0,j = 0,k=0,l=0;
 	for (int row = 0; row < cost_map.size[0]; ++row){
 		for (int col = 0; col < cost_map.size[1]; ++col){
 			for (int hei = 0;hei < cost_map.size[2]; ++ hei){
 				float cur_cost = cost_map.at<float>(row, col, hei);
-				// cur_cost = int(cur_cost*100)/100.0;
-				// cout << cur_cost;
-				// cout << "cur_cost:" << cur_cost << " ";
 				vector<int> color  = getColor(cur_cost);
 				// marker.pose.position.x = camera_pose.position.x + (row - cam_posid[0]) * resolution;
 				// marker.pose.position.y = camera_pose.position.y + (col - cam_posid[1]) * resolution;
 				// marker.pose.position.z = camera_pose.position.z + (hei - cam_posid[2]) * resolution;
-				vector<double> marker_pos{ (row - cam_posid[0]) * resolution,(col - cam_posid[1]) * resolution,(hei - cam_posid[2]) * resolution};
+				vector<double> marker_pos{(row - cam_posid[0]) * resolution,(col - cam_posid[1]) * resolution,(hei - cam_posid[2]) * resolution};
 				vector<double> pos = TransformPoint(Rwc,Twc,marker_pos);
-				
-				marker.pose.position.x = pos[0];
-				marker.pose.position.y = pos[1];
-				marker.pose.position.z = pos[2];
-				marker.color.r =  color[0];
-				marker.color.g = color[1];
-				marker.color.b = color[2];
-				marker.id = marker_id++;
-				markerArr.markers.push_back(marker);
-				marker_text.pose = marker.pose;
+				marker_text.pose.position.x = pos[0];
+				marker_text.pose.position.y = pos[1];
+				marker_text.pose.position.z = pos[2];
+				marker_text.color.r =  color[0];
+				marker_text.color.g = color[1];
+				marker_text.color.b = color[2];
+				marker_text.id = marker_id++;
+				// markerArr.markers.push_back(marker);				
+				// marker_text.pose = marker.pose;
 				marker_text.text = to_string(cur_cost).substr(0,4);
-				// cout << to_string(cur_cost).substr(0,4);
 				marker_text.id = marker_id - 1;
 				markerTextArr.markers.push_back(marker_text);
-				if(hei==cam_posid[2]){
+				if(col==cam_posid[1]){
 					markerHorizontalSliceTextArr.markers.push_back(marker_text);
 				}
-				if(col==cam_posid[1]){
+				if(row==cam_posid[0]){
 					markerVerticalSliceTextArr.markers.push_back(marker_text);
 				}
 
@@ -392,13 +387,12 @@ void VisualizeCostCube(cv::Mat cost_map){
 				cloud.points[i].y = pos[1]; // (col - cam_posid[1]) * resolution + cam_pos[1];
 				cloud.points[i].z = pos[2]; //  (hei - cam_posid[2]) * resolution + cam_pos[2];
 				cloud.channels[0].values[i] = int(cur_cost*100);
-
-				if(hei==cam_posid[2]){
+				if(col==cam_posid[1]){
 					horizontal_cloud.points[j] = cloud.points[i];
 					horizontal_cloud.channels[0].values[j] = cloud.channels[0].values[i];
 					j++;
 				}
-				if(col==cam_posid[1]){
+				if(row==cam_posid[0]){
 					vertical_cloud.points[k] = cloud.points[i];
 					vertical_cloud.channels[0].values[k] = cloud.channels[0].values[i];
 					k++;
@@ -407,7 +401,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 			}
 		}
 	}
-	vis_pub.publish(markerArr);
+	// vis_pub.publish(markerArr);
 	vis_text_pub.publish(markerTextArr);
 	horizontal_text_pub.publish(markerHorizontalSliceTextArr);
 	vertical_text_pub.publish(markerVerticalSliceTextArr);

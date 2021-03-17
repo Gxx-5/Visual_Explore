@@ -2,11 +2,12 @@
 #include "costcube.h"
 
 vector<double> TransformPoint(Eigen::Matrix3d rotation,Eigen::Vector3d translation,vector<double> pos){
+	Eigen::Vector3d eulerAngle=rotation.eulerAngles(2,1,0);
 	Eigen::Matrix4d transform = Eigen::Matrix4d::Zero();
 	transform.topLeftCorner<3,3>() = rotation;
 	transform.topRightCorner<3,1>() = translation.transpose();
 	transform(3,3) = 1;
-	Eigen::Matrix<double,4,1> point(pos[0],pos[1],pos[2,1],1);
+	Eigen::Matrix<double,4,1> point(pos[0],pos[1],pos[2],1);
 	Eigen::Matrix<double,4,1> point_trans = transform * point;
 	return vector<double>{point_trans(0,0),point_trans(1,0),point_trans(2,0)};
 }
@@ -40,11 +41,11 @@ CostCube::CostCube(string params_path){
 	dst_filter_factor = (double)read_params["dst_filter_factor"];
 	read_params.release();
 
-	size[0] =int(cam_width / resolution);  //x
-	size[1] =int(shooting_dst / resolution);//y
-	size[2] =int(cam_height / resolution); //z
-	filter_triangle = getFilterTriangle();
-	cam_posid = {int(size[0]/2) , 0 , int(size[2]/2)};
+	size[0] =int(cam_width / resolution); //x
+	size[1] =int(cam_height/ resolution); //y
+	size[2] =int(shooting_dst / resolution); //z
+	cam_posid = {int(size[0]/2) , int(size[1]/2) , 0};
+	filter_triangle = getFilterTriangle();	
 	printParams();
 }
 
