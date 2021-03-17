@@ -6,11 +6,11 @@ CostCube::CostCube(vector<double> input_vec){
 	for(int i=0;i<input_vec.size();++i){
 		*param[i]=input_vec[i];
 	}
-	size[0] = int(cam_width / resolution);
-	size[1] = int(cam_height / resolution);
-	size[2] = int(shooting_dst / resolution);
+	size[0] = int(shooting_dst / resolution); //x
+	size[1] = int(cam_width / resolution);//y
+	size[2] =int(cam_height / resolution); //z
 	filter_triangle = getFilterTriangle();
-	cam_posid = {int(size[0]/2),int(size[1]/2),0};
+	cam_posid = {0,int(size[1]/2),int(size[2]/2)};
 	printParams();
 }
 
@@ -294,8 +294,10 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
 	return map_prob;
 }
 
-cv::Mat CostCube::calCostCubeByDistance(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
-	
+cv::Mat CostCube::calCostCubeByDistance(double pos[3],pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
+	cam_pos[0] = pos[0];
+	cam_pos[1] = pos[1];
+	cam_pos[2] = pos[2];
 	map_prob = cv::Mat::zeros(3,size,CV_32FC1);
 	dst_mat = cv::Mat::zeros(3,size,CV_32FC1);
 	occupied_ind.clear();
@@ -479,9 +481,9 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,KDTree tree){
 }
 
 float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,int K){        
-	double x = (pos_id[0] -cam_posid[0]) * resolution;
-	double y = (pos_id[1] - cam_posid[1]) * resolution;
-	double z = (pos_id[2] - cam_posid[2]) * resolution;
+	double x = (pos_id[0] -cam_posid[0]) * resolution + cam_pos[0];
+	double y = (pos_id[1] - cam_posid[1]) * resolution + cam_pos[1];
+	double z = (pos_id[2] - cam_posid[2]) * resolution + cam_pos[2];
 	pcl::PointXYZ searchPoint{x,y,z};
 	float dst=0;
 	if(K>0){
@@ -511,7 +513,6 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,pcl::KdTreeFLANN<pcl::
 		return dst/count;
 	}
 }
-
 
 float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points,int tag){
 //Calculate average distance between current voxel and all map points in the field of view. 

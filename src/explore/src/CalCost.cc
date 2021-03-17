@@ -113,7 +113,7 @@ int main(int argc, char **argv)
 				// RTime rtime("Main Program");
 				// ros::Time stime = ros::Time::now();
 				// cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
-				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_cloud);
+				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(cam_pos,map_cloud);
 				// ros::Time etime = ros::Time::now();				
 				// cout << "CalCostCube time spent : " << (etime - stime).toSec() << endl;
 				if(detectObstacle(costcube_map)){
@@ -224,7 +224,7 @@ void poseStampedCallback(const geometry_msgs::PoseStamped &pose){
 	Twc(0,0) = pose.pose.position.x;
 	Twc(1,0) = pose.pose.position.y;
 	Twc(2,0) = pose.pose.position.z;
-	
+
 	cam_pos[0] = pose.pose.position.x;
 	cam_pos[1] = pose.pose.position.y;
 	cam_pos[2] = pose.pose.position.z;
@@ -298,7 +298,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 	visualization_msgs::MarkerArray markerVerticalSliceTextArr;
 
 	visualization_msgs::Marker marker;
-	marker.header.frame_id = "camera_link";
+	marker.header.frame_id = "map";
 	marker.header.stamp = ros::Time::now();
 	marker.ns = "";
 	marker.lifetime = ros::Duration();	
@@ -314,7 +314,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 	marker.color.a = 0.1; // Don't forget to set the alpha!
 	
 	visualization_msgs::Marker marker_text;
-	marker_text.header.frame_id = "camera_link";
+	marker_text.header.frame_id = "map";
 	marker_text.header.stamp = ros::Time::now();
 	marker_text.ns = "";
 	marker_text.lifetime = ros::Duration();	
@@ -327,12 +327,12 @@ void VisualizeCostCube(cv::Mat cost_map){
 	marker_text.scale.z = 0.3 * resolution;
 	marker_text.color.a = 1.0; // Don't forget to set the alpha!!
 
-	vector<int> cam_posid{int(cost_map.size[0] / 2),int(cost_map.size[1] / 2),0};
+	vector<int> cam_posid{0,int(cost_map.size[1] / 2),int(cost_map.size[2] / 2)};
 	// cout << int(field_size / resolution) << " " << cost_map.size[0] << endl;
 	int marker_id = 0;
 	for (int row = 0; row < cost_map.size[0]; ++row){
 		for (int col = 0; col < cost_map.size[1]; ++col){
-						for (int hei = 0;hei < cost_map.size[2]; ++ hei){
+			for (int hei = 0;hei < cost_map.size[2]; ++ hei){
 				float cur_cost = cost_map.at<float>(row, col, hei);
 				// cur_cost = int(cur_cost*100)/100.0;
 				// cout << cur_cost;
@@ -341,9 +341,9 @@ void VisualizeCostCube(cv::Mat cost_map){
 				// marker.pose.position.x = camera_pose.position.x + (row - cam_posid[0]) * resolution;
 				// marker.pose.position.y = camera_pose.position.y + (col - cam_posid[1]) * resolution;
 				// marker.pose.position.z = camera_pose.position.z + (hei - cam_posid[2]) * resolution;
-				marker.pose.position.x =  (row - cam_posid[0]) * resolution;
-				marker.pose.position.y =  (col - cam_posid[1]) * resolution;
-				marker.pose.position.z =  (hei - cam_posid[2]) * resolution;
+				marker.pose.position.x =  (row - cam_posid[0]) * resolution + cam_pos[0];
+				marker.pose.position.y =  (col - cam_posid[1]) * resolution + cam_pos[1];
+				marker.pose.position.z =  (hei - cam_posid[2]) * resolution + cam_pos[2];
 				marker.color.r =  color[0];
 				marker.color.g = color[1];
 				marker.color.b = color[2];
@@ -374,13 +374,13 @@ void VisualizeCostCube(cv::Mat cost_map){
 	sensor_msgs::PointCloud cloud;
 	int pt_num = cost_map.size[0]*cost_map.size[1]*cost_map.size[2];
 	cloud.header.stamp = ros::Time::now();
-		cloud.header.frame_id = "camera_link";//填充 PointCloud 消息的头：frame 和 timestamp．
-		cloud.points.resize(pt_num);//设置点云的数量．
+	cloud.header.frame_id = "map";//填充 PointCloud 消息的头：frame 和 timestamp．
+	cloud.points.resize(pt_num);//设置点云的数量．
  
-		//增加信道 "intensity" 并设置其大小，使与点云数量相匹配．
-		cloud.channels.resize(1);
-		cloud.channels[0].name = "intensities";
-		cloud.channels[0].values.resize(pt_num);
+	//增加信道 "intensity" 并设置其大小，使与点云数量相匹配．
+	cloud.channels.resize(1);
+	cloud.channels[0].name = "intensities";
+	cloud.channels[0].values.resize(pt_num);
 
 	sensor_msgs::PointCloud horizontal_cloud = cloud;
 	int slice_pt_num = cost_map.size[0]*cost_map.size[2];
@@ -392,12 +392,12 @@ void VisualizeCostCube(cv::Mat cost_map){
 	vertical_cloud.channels[0].values.resize(slice_pt_num);
 	//使用虚拟数据填充 PointCloud 消息．同时，使用虚拟数据填充 intensity 信道．
 	int i=0,j = 0,k=0;
-		for (int row = 0; row < cost_map.size[0]; ++row)
+	for (int row = 0; row < cost_map.size[0]; ++row)
 		for (int col = 0; col < cost_map.size[1]; ++col)
-						for (int hei = 0;hei < cost_map.size[2]; ++ hei){
-				cloud.points[i].x = (row - cam_posid[0]) * resolution;
-				cloud.points[i].y = (col - cam_posid[1]) * resolution;
-				cloud.points[i].z =  (hei - cam_posid[2]) * resolution;
+			for (int hei = 0;hei < cost_map.size[2]; ++ hei){
+				cloud.points[i].x = (row - cam_posid[0]) * resolution  + cam_pos[0];
+				cloud.points[i].y = (col - cam_posid[1]) * resolution + cam_pos[1];
+				cloud.points[i].z =  (hei - cam_posid[2]) * resolution + cam_pos[2];
 				float cur_cost = cost_map.at<float>(row, col, hei);
 				cloud.channels[0].values[i] = int(cur_cost*100);				
 
@@ -412,8 +412,8 @@ void VisualizeCostCube(cv::Mat cost_map){
 					k++;
 				}
 				i++;
-				}
-		costcloud_pub.publish(cloud);
+			}	
+	costcloud_pub.publish(cloud);
 	horizontal_cloud_pub.publish(horizontal_cloud);
 	vertical_cloud_pub.publish(vertical_cloud);
 }

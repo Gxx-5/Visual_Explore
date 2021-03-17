@@ -56,7 +56,8 @@ public:
   double getresolution();
   cv::Mat calCostCubeByBresenham3D(vector<geometry_msgs::Point> map_points);
   cv::Mat calCostCubeByDistance(vector<geometry_msgs::Point> map_points);
-  cv::Mat calCostCubeByDistance(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+  // cv::Mat calCostCubeByDistance(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+  cv::Mat calCostCubeByDistance(double cam_pos[3],pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
   void processMapPts(const std::vector<geometry_msgs::Point> &pts,bool cal_occupied_only=false);
   bool Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
   float computeCostByDistance(const float distance);
