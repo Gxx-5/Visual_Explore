@@ -38,7 +38,6 @@ vector<int> cam_posid;
 vector<geometry_msgs::Point> map_points;//store map points within the field of vision
 pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-
 //Publish
 ros::Publisher vis_pub,vis_text_pub,horizontal_text_pub,vertical_text_pub;
 ros::Publisher costcloud_pub;
@@ -116,7 +115,7 @@ int main(int argc, char **argv)
 				// ros::Time stime = ros::Time::now();
 				// cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
 				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(Rwc,Twc,map_cloud);
-				// ros::Time etime = ros::Time::now();				
+				// ros::Time etime = ros::Time::now();
 				// cout << "CalCostCube time spent : " << (etime - stime).toSec() << endl;
 				if(detectObstacle(costcube_map)){
 					cout << "Detected obstacle ahead!!!! Stop automatically." << endl;

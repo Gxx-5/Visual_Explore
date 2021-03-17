@@ -1,8 +1,9 @@
 <launch>
+	<arg name="rate" default="100"/>
 	<arg name="parent_frame"  default="/map"/>
 	<arg name="child_frame" default="/camera_link"/>
+
 	<arg name="pose_name" default="/cam_pose"/> <!--rostopic type : geometry_msgs::PoseStamped-->
-	<arg name="rate" default="100"/>
 	<arg name="cloud_name" default="/ros_cloud"/>  <!--rostopic type : sensor_msgs::PointCloud2-->
 	<arg name="obs_count"  default="10"/>
 	<arg name="obs_cost"  default="0.6"/>

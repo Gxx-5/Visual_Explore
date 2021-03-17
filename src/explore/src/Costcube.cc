@@ -319,10 +319,10 @@ cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d
 	for (int row = 0; row < size[0]; ++row)
 		for (int col = 0; col < size[1]; ++col)
 			for (int hei = 0;hei < size[2]; ++ hei){
-				// if(hei < filter_triangle[row]){
-				// 	map_prob.at<float>(row, col, hei) = 0.0;
-				// 	continue;
-				// }
+				if(hei < filter_triangle[row]){
+					map_prob.at<float>(row, col, hei) = 0.0;
+					continue;
+				}
 				vector<double> marker_pos{ (row - cam_posid[0]) * resolution,(col - cam_posid[1]) * resolution,(hei - cam_posid[2]) * resolution};
 				vector<double> pos = TransformPoint(rotation,translation,marker_pos);
 				float dst = dstFromVoxelToObstacle(pos,kdtree,int(kdtree_K));
