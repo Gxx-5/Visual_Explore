@@ -3,6 +3,9 @@
 #include "geometry_msgs/Point.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/viz.hpp>
+#include <Eigen/Eigen>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <ctime>
 #include <algorithm>
 #include "KDTree.hpp"
@@ -44,6 +47,9 @@ obstacle cell
 **/
 
 //double _shooting_dst,double _cam_width,double _cam_height,double _resolution,double _dst_filter_factor = 0.1,double _cost_scaling_factor = 10.0
+
+vector<double> TransformPoint(Eigen::Matrix3d rotation,Eigen::Vector3d translation,vector<double> pos);
+
 class CostCube
 {
 public:
@@ -57,18 +63,21 @@ public:
   cv::Mat calCostCubeByBresenham3D(vector<geometry_msgs::Point> map_points);
   cv::Mat calCostCubeByDistance(vector<geometry_msgs::Point> map_points);
   // cv::Mat calCostCubeByDistance(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
-  cv::Mat calCostCubeByDistance(double cam_pos[3],pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+  cv::Mat calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
   void processMapPts(const std::vector<geometry_msgs::Point> &pts,bool cal_occupied_only=false);
   bool Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
   float computeCostByDistance(const float distance);
   float dstFromVoxelToObstacle(vector<int> pos_id);
   float dstFromVoxelToObstacle(vector<int> pos_id,KDTree tree);
-  float dstFromVoxelToObstacle(vector<int> pos_id,pcl::KdTreeFLANN<pcl::PointXYZ> tree,int K);
+  float dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::PointXYZ> tree,int K);
 	float dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points);        
 	float dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points,int tag);
   float dstFromVoxelToObstacle(vector<int> pos_id,map<double,geometry_msgs::Point> map_pts);
 	// float dstFromVoxelToObstacle(vector<int> pos_id,map<int,pair<double,geometry_msgs::Point>> map_pts);
 	map<int,int> getFilterTriangle();
+
+    int size[3];
+    vector<int> cam_posid;
 
 private:
   double shooting_dst = 0.5;// the farest distance camera can catch in world coordinate. default : 0.5
@@ -84,11 +93,9 @@ private:
   double* param[10]{&shooting_dst,&cam_width,&cam_height,&resolution,&kdtree_radius,&kdtree_K,
                                           &cost_scaling_factor,&trapezoid_hei,&trapezoid_len,&dst_filter_factor};
   // double* param[10]={&shooting_dst,&cam_width,&cam_height,&resolution,&kdtree_radius,&cost_scaling_factor,&trapezoid_hei,&trapezoid_len,&dst_filter_factor};
-  int size[3];
-  double cam_pos[3];
-  vector<int> cam_posid;
-	map<int,int> filter_triangle;
 
+  double cam_pos[3];
+	map<int,int> filter_triangle;
   cv::Mat map_prob;
   cv::Mat dst_mat;
   cv::Mat occupied_counter, visit_counter;
@@ -124,3 +131,4 @@ public:
 private:
   const float digit;
 };
+

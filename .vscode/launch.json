@@ -1,0 +1,28 @@
+{
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "explore_node",
+                "type": "cppdbg",
+                "request": "launch",
+                "program": "${workspaceFolder}/devel/lib/explore/explore_node",
+                // "program": "${workspaceFolder}/Examples/ROS/ORB_SLAM2/Monopub",
+                "args": [
+                ],
+                "stopAtEntry": false,
+                "cwd": "${workspaceFolder}",
+                "environment": [],
+                "externalConsole": false,
+                "preLaunchTask": "prerun",
+                "MIMode": "gdb",
+                "avoidWindowsConsoleRedirection": true,
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ]
+            }
+        ]
+    }

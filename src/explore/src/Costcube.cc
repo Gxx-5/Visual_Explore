@@ -1,6 +1,16 @@
 #include <queue>
 #include "costcube.h"
 
+vector<double> TransformPoint(Eigen::Matrix3d rotation,Eigen::Vector3d translation,vector<double> pos){
+	Eigen::Matrix4d transform = Eigen::Matrix4d::Zero();
+	transform.topLeftCorner<3,3>() = rotation;
+	transform.topRightCorner<3,1>() = translation.transpose();
+	transform(3,3) = 1;
+	Eigen::Matrix<double,4,1> point(pos[0],pos[1],pos[2,1],1);
+	Eigen::Matrix<double,4,1> point_trans = transform * point;
+	return vector<double>{point_trans(0,0),point_trans(1,0),point_trans(2,0)};
+}
+
 CostCube::CostCube(vector<double> input_vec){
 	// double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
 	for(int i=0;i<input_vec.size();++i){
@@ -30,11 +40,11 @@ CostCube::CostCube(string params_path){
 	dst_filter_factor = (double)read_params["dst_filter_factor"];
 	read_params.release();
 
-	size[0] = int(cam_width / resolution);
-	size[1] = int(cam_height / resolution);
-	size[2] = int(shooting_dst / resolution);
+	size[0] =int(cam_width / resolution);  //x
+	size[1] =int(shooting_dst / resolution);//y
+	size[2] =int(cam_height / resolution); //z
 	filter_triangle = getFilterTriangle();
-	cam_posid = {int(size[0]/2),int(size[1]/2),0};
+	cam_posid = {int(size[0]/2) , 0 , int(size[2]/2)};
 	printParams();
 }
 
@@ -234,7 +244,7 @@ bool compare(const geometry_msgs::Point& p1,const geometry_msgs::Point& p2){
 	else
 		return false;               
 }
-
+/*
 //map points must be relative coords of key points in camera_link coordinate.
 cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points){
 	map_prob = cv::Mat::zeros(3,size,CV_32FC1);
@@ -293,11 +303,9 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
 			}
 	return map_prob;
 }
+*/
 
-cv::Mat CostCube::calCostCubeByDistance(double pos[3],pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
-	cam_pos[0] = pos[0];
-	cam_pos[1] = pos[1];
-	cam_pos[2] = pos[2];
+cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
 	map_prob = cv::Mat::zeros(3,size,CV_32FC1);
 	dst_mat = cv::Mat::zeros(3,size,CV_32FC1);
 	occupied_ind.clear();
@@ -305,17 +313,18 @@ cv::Mat CostCube::calCostCubeByDistance(double pos[3],pcl::PointCloud<pcl::Point
 		cout << "no map points received!" << endl;
 		return map_prob;
 	}
-
 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;  //建立kdtree对象
 	kdtree.setInputCloud(cloud); //设置需要建立kdtree的点云指针
 	for (int row = 0; row < size[0]; ++row)
 		for (int col = 0; col < size[1]; ++col)
 			for (int hei = 0;hei < size[2]; ++ hei){
-				if(hei < filter_triangle[row]){
-					map_prob.at<float>(row, col, hei) = 0.0;
-					continue;
-				}
-				float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},kdtree,int(kdtree_K));
+				// if(hei < filter_triangle[row]){
+				// 	map_prob.at<float>(row, col, hei) = 0.0;
+				// 	continue;
+				// }
+				vector<double> marker_pos{ (row - cam_posid[0]) * resolution,(col - cam_posid[1]) * resolution,(hei - cam_posid[2]) * resolution};
+				vector<double> pos = TransformPoint(rotation,translation,marker_pos);
+				float dst = dstFromVoxelToObstacle(pos,kdtree,int(kdtree_K));
 				dst_mat.at<float>(row, col, hei) = dst;
 				if(dst < 0){//something wrong happen,dont change map_prob
 					cout << "something wrong happen while calculating CostCube by Distance." << endl;
@@ -480,11 +489,11 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,KDTree tree){
 	return ave_dst/ptVec.size();
 }
 
-float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,int K){        
-	double x = (pos_id[0] -cam_posid[0]) * resolution + cam_pos[0];
-	double y = (pos_id[1] - cam_posid[1]) * resolution + cam_pos[1];
-	double z = (pos_id[2] - cam_posid[2]) * resolution + cam_pos[2];
-	pcl::PointXYZ searchPoint{x,y,z};
+float CostCube::dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,int K){        
+	// double x = (pos_id[0] -cam_posid[0]) * resolution + cam_pos[0];
+	// double y = (pos_id[1] - cam_posid[1]) * resolution + cam_pos[1];
+	// double z = (pos_id[2] - cam_posid[2]) * resolution + cam_pos[2];
+	pcl::PointXYZ searchPoint{pos[0],pos[1],pos[2]};
 	float dst=0;
 	if(K>0){
 		std::vector<int> pointIdxNKNSearch(K);  //保存每个近邻点的索引

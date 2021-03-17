@@ -9,7 +9,15 @@
 	],
 	"settings": {
 		"files.associations": {
-			"iostream": "cpp"
+			"iostream": "cpp",
+			"core": "cpp",
+			"array": "cpp",
+			"hash_map": "cpp",
+			"hash_set": "cpp",
+			"bitset": "cpp",
+			"initializer_list": "cpp",
+			"string_view": "cpp",
+			"utility": "cpp"
 		},
 		"python.autoComplete.extraPaths": [
 			"/opt/ros/melodic/lib/python2.7/dist-packages"

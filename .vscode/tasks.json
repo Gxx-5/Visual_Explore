@@ -1,27 +1,34 @@
 {
-        "tasks": [
-                {
-                        "type": "cppbuild",
-                        "label": "C/C++: g++ 生成活动文件",
-                        "command": "/usr/bin/g++",
-                        "args": [
-                                "-g",
-                                "${file}",
-                                "-o",
-                                "${fileDirname}/${fileBasenameNoExtension}"
-                        ],
-                        "options": {
-                                "cwd": "${workspaceFolder}"
-                        },
-                        "problemMatcher": [
-                                "$gcc"
-                        ],
-                        "group": {
-                                "kind": "build",
-                                "isDefault": true
-                        },
-                        "detail": "调试器生成的任务。"
-                }
-        ],
-        "version": "2.0.0"
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "prerun",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/devel/setup.zsh"
+            // "command": "source ./devel/setup.zsh && rosparam load ${workspaceFolder}/src/orb_slam_2_ros/ros/config/param.yaml"
+        },
+        {
+            "label": "roslaunch explore visual_explore.launch",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/devel/setup.zsh && roslaunch explore visual_explore.launch"
+        },        
+        {
+            "label": "rosbag play orb_pointscloud.bag",
+            "type": "shell",
+            "command": "cd /home/gxx/WorkSpace/1Dataset && rosbag play orb_pointscloud.bag -r 1"
+        },
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "catkin_make",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always"
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
 }
