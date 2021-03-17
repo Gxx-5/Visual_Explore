@@ -32,8 +32,11 @@ std::string cloud_name = "/map_cloud";
 std::string pose_name = "/camera_pose";
 Eigen::Matrix3d Rwc;
 Eigen::Vector3d Twc;
+double cam_pos[3];
 
 vector<geometry_msgs::Point> map_points;//store map points within the field of vision
+pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
 
 //Publish
 ros::Publisher vis_pub,vis_text_pub,horizontal_text_pub,vertical_text_pub;
@@ -50,6 +53,7 @@ void parseParams(int argc, char **argv);
 void printParams();
 void preProcess(const sensor_msgs::PointCloud::ConstPtr& pt_cloud);
 void preProcess2(const sensor_msgs::PointCloud2::ConstPtr& pt_cloud);
+void preProcessRosMsg2Pcl(const sensor_msgs::PointCloud2::ConstPtr& pt_cloud2);
 void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher publisher);
 void poseCallback(const geometry_msgs::PoseStamped &pose);
 void poseStampedCallback(const geometry_msgs::PoseStamped &pose);
@@ -85,10 +89,11 @@ int main(int argc, char **argv)
 	ros::Subscriber pose_sub = n.subscribe(pose_name, 10, &poseStampedCallback);
 	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,boost::bind(&preProcess,_1,map_points));
 	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,&preProcess);
-	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud2>(cloud_name,1,&preProcess2);
+	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud2>(cloud_name,1,&preProcess2);
+	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud2>(cloud_name,1,&preProcessRosMsg2Pcl);
 
 	//Publish
-	pt_pub = n.advertise<sensor_msgs::PointCloud>("cam_pt_cloud",10);
+	pt_pub = n.advertise<sensor_msgs::PointCloud>("pt_cloud",10);
 	vis_pub = n.advertise<visualization_msgs::MarkerArray>("costcube",10);
 	vis_text_pub = n.advertise<visualization_msgs::MarkerArray>("cost_text",10);
 	horizontal_text_pub = n.advertise<visualization_msgs::MarkerArray>("horizontal_text", 10);
@@ -107,7 +112,8 @@ int main(int argc, char **argv)
 			{
 				// RTime rtime("Main Program");
 				// ros::Time stime = ros::Time::now();
-				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
+				// cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
+				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_cloud);
 				// ros::Time etime = ros::Time::now();				
 				// cout << "CalCostCube time spent : " << (etime - stime).toSec() << endl;
 				if(detectObstacle(costcube_map)){
@@ -180,13 +186,17 @@ void preProcess2(const sensor_msgs::PointCloud2::ConstPtr& pt_cloud2){
 	for(int i=0;i<pt_cloud->points.size();++i){
 		geometry_msgs::Point point;
 		Eigen::Vector3d pos(pt_cloud->points[i].x,pt_cloud->points[i].y,pt_cloud->points[i].z);
-		pos = Rwc.inverse()*(pos - Twc);
+		pos = Rwc.inverse()*(pos - Twc); // transform key points from "map" coordinate to "camera_link" coordinate and get relative coord.
 		point.x = pos(0,0);
 		point.y = pos(1,0);
 		point.z = pos(2,0);
 		map_points.push_back(point);
 	}
 	cout << "map_points.size: " << map_points.size() << endl;
+}
+
+void preProcessRosMsg2Pcl(const sensor_msgs::PointCloud2::ConstPtr& pt_cloud2){
+	pcl::fromROSMsg(*pt_cloud2, *map_cloud);
 }
 
 void poseCallback(const geometry_msgs::Pose &pose){
@@ -214,6 +224,10 @@ void poseStampedCallback(const geometry_msgs::PoseStamped &pose){
 	Twc(0,0) = pose.pose.position.x;
 	Twc(1,0) = pose.pose.position.y;
 	Twc(2,0) = pose.pose.position.z;
+	
+	cam_pos[0] = pose.pose.position.x;
+	cam_pos[1] = pose.pose.position.y;
+	cam_pos[2] = pose.pose.position.z;
 }
 
 // void mainProcess(vector<geometry_msgs::Point> map_points){
@@ -223,6 +237,7 @@ void poseStampedCallback(const geometry_msgs::PoseStamped &pose){
 
 void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher publisher){
 	int size = map_points.size();
+	cout << "PublishMapPoints size: " << size << endl;
 	sensor_msgs::PointCloud pt_cloud;
 	pt_cloud.header.stamp = ros::Time::now();
 	pt_cloud.header.frame_id = "camera_link";	

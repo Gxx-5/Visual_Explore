@@ -1,0 +1,1 @@
+/usr/bin/c++ -rdynamic CMakeFiles/error_test.dir/error_test.o -o error_test  -lKDTree 

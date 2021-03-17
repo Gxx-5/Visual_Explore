@@ -235,6 +235,7 @@ bool compare(const geometry_msgs::Point& p1,const geometry_msgs::Point& p2){
 		return false;               
 }
 
+//map points must be relative coords of key points in camera_link coordinate.
 cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points){
 	map_prob = cv::Mat::zeros(3,size,CV_32FC1);
 	dst_mat = cv::Mat::zeros(3,size,CV_32FC1);
@@ -289,6 +290,36 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
 				map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
 				// map_prob.at<float>(row, col, hei) = dst; 
 				// cout << "dst: " <<  dst << " " << ",cost : " <<  computeCostByDistance(dst) << endl;
+			}
+	return map_prob;
+}
+
+cv::Mat CostCube::calCostCubeByDistance(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
+	
+	map_prob = cv::Mat::zeros(3,size,CV_32FC1);
+	dst_mat = cv::Mat::zeros(3,size,CV_32FC1);
+	occupied_ind.clear();
+	if(cloud->size()==0){
+		cout << "no map points received!" << endl;
+		return map_prob;
+	}
+
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;  //建立kdtree对象
+	kdtree.setInputCloud(cloud); //设置需要建立kdtree的点云指针
+	for (int row = 0; row < size[0]; ++row)
+		for (int col = 0; col < size[1]; ++col)
+			for (int hei = 0;hei < size[2]; ++ hei){
+				if(hei < filter_triangle[row]){
+					map_prob.at<float>(row, col, hei) = 0.0;
+					continue;
+				}
+				float dst = dstFromVoxelToObstacle(vector<int>{row,col,hei},kdtree,int(kdtree_K));
+				dst_mat.at<float>(row, col, hei) = dst;
+				if(dst < 0){//something wrong happen,dont change map_prob
+					cout << "something wrong happen while calculating CostCube by Distance." << endl;
+					return map_prob;
+				}
+				map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
 			}
 	return map_prob;
 }

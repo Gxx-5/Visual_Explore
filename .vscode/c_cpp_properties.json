@@ -8,7 +8,7 @@
             "includePath": [
                 "/opt/ros/melodic/include",
                 "/usr/include",
-               "/home/gxx/WorkSpace/Visual_Explore_ws/src/explore/include",
+                "${workspaceFolder}/src/explore/include",
                 // "/home/wor/GZX/Visual_Explore/src/explore/include",
                 "/usr/include/pcl-1.8/",
                 "/usr/include/eigen3/",
@@ -16,9 +16,10 @@
             ],
             "name": "Linux",
             "intelliSenseMode": "gcc-x64",
-            "compilerPath": "/usr/lib/ccache/clang",
+            "compilerPath": "/usr/bin/gcc", // "/usr/lib/ccache/clang",
             "cStandard": "c11",
-            "cppStandard": "c++14"
+            "cppStandard": "c++14",
+            "compileCommands": "/home/gxx/WorkSpace/orb_slam2_ws/build/orb_slam2_ros/compile_commands.json"
         }
     ],
     "version": 4

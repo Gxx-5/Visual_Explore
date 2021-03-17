@@ -38,6 +38,11 @@ obstacle cell
   }
 */
 
+/**
+ * KDTree、Annoy、HNSW原理和使用方法介绍
+ * https://my.oschina.net/u/4410617/blog/4354043
+**/
+
 //double _shooting_dst,double _cam_width,double _cam_height,double _resolution,double _dst_filter_factor = 0.1,double _cost_scaling_factor = 10.0
 class CostCube
 {
@@ -51,6 +56,7 @@ public:
   double getresolution();
   cv::Mat calCostCubeByBresenham3D(vector<geometry_msgs::Point> map_points);
   cv::Mat calCostCubeByDistance(vector<geometry_msgs::Point> map_points);
+  cv::Mat calCostCubeByDistance(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
   void processMapPts(const std::vector<geometry_msgs::Point> &pts,bool cal_occupied_only=false);
   bool Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
   float computeCostByDistance(const float distance);
@@ -78,6 +84,7 @@ private:
                                           &cost_scaling_factor,&trapezoid_hei,&trapezoid_len,&dst_filter_factor};
   // double* param[10]={&shooting_dst,&cam_width,&cam_height,&resolution,&kdtree_radius,&cost_scaling_factor,&trapezoid_hei,&trapezoid_len,&dst_filter_factor};
   int size[3];
+  double cam_pos[3];
   vector<int> cam_posid;
 	map<int,int> filter_triangle;
 

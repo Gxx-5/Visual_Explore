@@ -16,3 +16,13 @@
 
 1. [ ] 构思代码框架（可通行方向 + 位姿图）
 2. [ ] 编写代码
+
+## 2021.3.3
+
+1. [√] 修改orb_slam2，发布局部key points(调整explore接受点云类型为pointscloud2)
+2. [ ] 转换costcube方向至orb_pose上
+3. [ ] FilterDirection.cc三个方法实现
+
+## 2021.3.4
+
+1. [ ] 实时发布局部点云
