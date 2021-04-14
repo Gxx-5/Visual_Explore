@@ -306,6 +306,18 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
 }
 */
 
+pcl::PointCloud<pcl::PointXYZ>::Ptr CostCube::filterCloud(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+	vector<double> marker_pos{ (0 - cam_posid[0]) * resolution,(0 - cam_posid[1]) * resolution,(0 - cam_posid[2]) * resolution};
+	vector<double> pos = TransformPoint(rotation,translation,marker_pos);
+	for(auto p : cloud->points){
+		if(p.z>pos[2]){
+			cloud_filtered->push_back(p);
+		}
+	}
+	return cloud_filtered;
+}
+
 cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
 	map_prob = cv::Mat::zeros(3,size,CV_32FC1);
 	dst_mat = cv::Mat::zeros(3,size,CV_32FC1);
@@ -314,8 +326,9 @@ cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d
 		cout << "no map points received!" << endl;
 		return map_prob;
 	}
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered = filterCloud(rotation,translation,cloud);
 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;  //建立kdtree对象
-	kdtree.setInputCloud(cloud); //设置需要建立kdtree的点云指针
+	kdtree.setInputCloud(cloud_filtered); //设置需要建立kdtree的点云指针
 	for (int row = 0; row < size[0]; ++row)
 		for (int col = 0; col < size[1]; ++col)
 			for (int hei = 0;hei < size[2]; ++ hei){
@@ -331,6 +344,7 @@ cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d
 					cout << "something wrong happen while calculating CostCube by Distance." << endl;
 					return map_prob;
 				}
+				// map_prob.at<float>(row, col, hei) = dst*col/size[1];
 				map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
 			}
 	return map_prob;
@@ -495,33 +509,49 @@ float CostCube::dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::
 	// double y = (pos_id[1] - cam_posid[1]) * resolution + cam_pos[1];
 	// double z = (pos_id[2] - cam_posid[2]) * resolution + cam_pos[2];
 	pcl::PointXYZ searchPoint{pos[0],pos[1],pos[2]};
+	int nearby_count = 0;
+	int count=0;
 	float dst=0;
+	float cost = 0;
 	if(K>0){
 		std::vector<int> pointIdxNKNSearch(K);  //保存每个近邻点的索引
 		std::vector<float> pointNKNSquaredDistance(K); //保存每个近邻点与查找点之间的欧式距离平方
 		kdtree.nearestKSearch(searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance);
 		for(vector<float>::iterator it=pointNKNSquaredDistance.begin();it!=pointNKNSquaredDistance.end();++it){
-			dst+=sqrt(*it);                  
+			cost +=computeCostByDistance(*it);
+			dst+=sqrt(*it);
+			count++;
 		}
-		return dst/K;
 	}
 	else{
 		std::vector<int> pointIdxRadiusSearch;  //保存每个近邻点的索引
 		std::vector<float> pointRadiusSquaredDistance;  //保存每个近邻点与查找点之间的欧式距离平方
-		kdtree.radiusSearch(searchPoint, kdtree_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
-		int count=0;
+		kdtree.radiusSearch(searchPoint, kdtree_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);		
 		for(vector<float>::iterator it=pointRadiusSquaredDistance.begin();it!=pointRadiusSquaredDistance.end();++it){
-			dst+=sqrt(*it);
+			// cost +=1/(sqrt(*it));
+			cost += computeCostByDistance(*it);
+			dst += sqrt(*it);
 			count++;
+			if(*it<0.1)
+				nearby_count++;
 		}
-		if(count==0){
-			std::vector<int> pointIdxNKNSearch(1); 
-			std::vector<float> pointNKNSquaredDistance(1);
-			kdtree.nearestKSearch(searchPoint, 1, pointIdxNKNSearch, pointNKNSquaredDistance); 
-			return sqrt(pointNKNSquaredDistance[0]);
+		if(count<50){
+			int K_extra = 50;
+			std::vector<int> pointIdxNKNSearch(K_extra); 
+			std::vector<float> pointNKNSquaredDistance(K_extra);
+			kdtree.nearestKSearch(searchPoint, K_extra, pointIdxNKNSearch, pointNKNSquaredDistance); 
+			for(vector<float>::iterator it=pointNKNSquaredDistance.begin();it!=pointNKNSquaredDistance.end();++it){
+				cost +=computeCostByDistance(*it);
+				dst+=sqrt(*it);
+				count++;
+			}
+			// return sqrt(pointNKNSquaredDistance[0]);
 		}
-		return dst/count;
 	}
+	// cout << count << endl;
+	return dst/count * (1-nearby_count/count);
+	// return cost/count;
+	// return cost/count + nearby_count/200;
 }
 
 float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::Point> map_points,int tag){
@@ -574,10 +604,10 @@ float CostCube::computeCostByDistance(const float distance)
 {
 	float cost;
 	if(distance < inscribed_radius_){
-		cost = 1.0;
+		cost = max_cost;
 	}
 	else{
-		cost = exp(-1.0 * cost_scaling_factor * (distance - inscribed_radius_));
+		cost = max_cost * exp(-1.0 * cost_scaling_factor * (distance - inscribed_radius_));
 		// cost = 255 * cost;//(unsigned char)((INSCRIBED_INFLATED_OBSTACLE - 1) * factor);
 	}
 	// cout << "compute process : dst: " << distance << " cost: " <<  cost << endl;

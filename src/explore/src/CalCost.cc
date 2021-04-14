@@ -28,8 +28,8 @@ double resolution;//resolution of CostCube
 vector<double> input_vec;//initial param of CostCube 
 double obs_cost;
 int obs_count;
-std::string cloud_name = "/map_cloud";
-std::string pose_name = "/camera_pose";
+std::string cloud_name = "/ros_cloud";
+std::string pose_name = "/cam_pose";
 Eigen::Matrix3d Rwc;
 Eigen::Vector3d Twc;
 double cam_pos[3];

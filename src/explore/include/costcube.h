@@ -67,6 +67,7 @@ public:
   void processMapPts(const std::vector<geometry_msgs::Point> &pts,bool cal_occupied_only=false);
   bool Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
   float computeCostByDistance(const float distance);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filterCloud(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
   float dstFromVoxelToObstacle(vector<int> pos_id);
   float dstFromVoxelToObstacle(vector<int> pos_id,KDTree tree);
   float dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::PointXYZ> tree,int K);
@@ -102,7 +103,8 @@ private:
   vector<vector<int>> occupied_ind;
   int free_thresh = 5;
   int occupied_thresh = 5;
-  double inscribed_radius_ = 0.01;
+  double inscribed_radius_ = 0.1;
+  double max_cost = 1.0;
 };
 
 class RTime{

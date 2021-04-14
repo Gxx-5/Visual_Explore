@@ -30,4 +30,6 @@
 		<!-- <rosparam file="$(find explore)/config/params.yaml" command="load"/> -->
 	</node>
 
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find explore)/config/explore.rviz" required="true" />
+
 </launch>
