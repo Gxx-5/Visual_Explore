@@ -17,10 +17,13 @@
 			"bitset": "cpp",
 			"initializer_list": "cpp",
 			"string_view": "cpp",
-			"utility": "cpp"
+			"utility": "cpp",
+			"ostream": "cpp",
+			"*.tcc": "cpp"
 		},
 		"python.autoComplete.extraPaths": [
 			"/opt/ros/melodic/lib/python2.7/dist-packages"
-		]
+		],
+		"ros.distro": "melodic"
 	}
 }

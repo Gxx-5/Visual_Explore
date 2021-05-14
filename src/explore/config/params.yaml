@@ -4,8 +4,8 @@
 # obs_count: 10
 # obs_cost: 0.6
 shooting_dst: 1.2 # 0.15 # length of  detection area
-cam_width: 1.0 # 0.06 # width of  detection area
-cam_height:  0.05 # 0.005 # height of  detection area
+cam_width: 0.8 # 0.06 # width of  detection area
+cam_height:  0.02 # 0.005 # height of  detection area
 resolution: 0.02 # 0.005 # resolution of  detection area
 kdtree_radius: 0.5 # scan radius of each point in detection area
 kdtree_K: 0 # 0 - scan kdtree by distance , n - scan kdtree by particular points number.

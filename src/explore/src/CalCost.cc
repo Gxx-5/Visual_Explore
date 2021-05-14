@@ -15,7 +15,10 @@
 #include <Eigen/Eigen>
 #include <opencv2/core/core.hpp>
 #include "costcube.h"
-#include<mutex>
+#include <mutex>
+#include <cv_bridge/cv_bridge.h>
+#include <image_transport/image_transport.h>
+#include <opencv2/highgui/highgui.hpp>
 
 using namespace std;
 
@@ -34,6 +37,7 @@ Eigen::Matrix3d Rwc;
 Eigen::Vector3d Twc;
 double cam_pos[3];
 vector<int> cam_posid;
+cv::Mat image_raw;
 
 vector<geometry_msgs::Point> map_points;//store map points within the field of vision
 pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -43,6 +47,7 @@ ros::Publisher vis_pub,vis_text_pub,horizontal_text_pub,vertical_text_pub;
 ros::Publisher costcloud_pub;
 ros::Publisher horizontal_cloud_pub,vertical_cloud_pub;
 ros::Publisher pt_pub;
+image_transport::Publisher image_pub;
 
 std::mutex mpt_mutex;
 std::mutex pose_mutex;
@@ -58,6 +63,9 @@ void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher pub
 void poseCallback(const geometry_msgs::PoseStamped &pose);
 void poseStampedCallback(const geometry_msgs::PoseStamped &pose);
 bool detectObstacle(cv::Mat cost_map);
+void imageCallBack(const sensor_msgs::ImageConstPtr& msg);
+void showObstacle2D(cv::Mat cost_map);
+vector<uchar> getColor(int value);
 
 template <typename Func,typename Var,typename Ret>
 void getTime(Func func,Var var,Ret ret){
@@ -72,6 +80,7 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "explore");
 	// ros::start();
 	ros::NodeHandle n;
+	image_transport::ImageTransport it(n);
 	parseParams(argc, argv);
 	printParams();
 	// CostCube COSTCUBE(input_vec);
@@ -92,6 +101,7 @@ int main(int argc, char **argv)
 	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud>(cloud_name,1,&preProcess);
 	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud2>(cloud_name,1,&preProcess2);
 	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud2>(cloud_name,1,&preProcessRosMsg2Pcl);
+	ros::Subscriber image_sub = n.subscribe<sensor_msgs::Image>("debug_image",1,&imageCallBack);
 
 	//Publish
 	// pt_pub = n.advertise<sensor_msgs::PointCloud>("pt_cloud",10);
@@ -102,7 +112,8 @@ int main(int argc, char **argv)
 	costcloud_pub = n.advertise<sensor_msgs::PointCloud>("costcloud", 10);
 	horizontal_cloud_pub = n.advertise<sensor_msgs::PointCloud>("horizontal_costcloud", 10);
 	vertical_cloud_pub = n.advertise<sensor_msgs::PointCloud>("vertical_costcloud", 10);
-	ros::Publisher vel_pub= n.advertise<geometry_msgs::Twist>("cmd_vel",1,true);
+	image_pub = it.advertise("image_modified",1);
+	ros::Publisher vel_pub= n.advertise<geometry_msgs::Twist>("cmd_vel",1,true);	
 
 	ros::Rate loop_rate(100);
 	while(ros::ok()){
@@ -117,18 +128,20 @@ int main(int argc, char **argv)
 				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(Rwc,Twc,map_cloud);
 				// ros::Time etime = ros::Time::now();
 				// cout << "CalCostCube time spent : " << (etime - stime).toSec() << endl;
-				if(detectObstacle(costcube_map)){
-					cout << "Detected obstacle ahead!!!! Stop automatically." << endl;
-					geometry_msgs::Twist twist;
-					twist.linear.x=0;
-					twist.linear.y=0;
-					twist.linear.z=0;
-					twist.angular.x=0;
-					twist.angular.y=0;
-					twist.angular.z=0;
-					vel_pub.publish(twist);
-				}
+
+				// if(detectObstacle(costcube_map)){
+				// 	cout << "Detected obstacle ahead!!!! Stop automatically." << endl;
+				// 	geometry_msgs::Twist twist;
+				// 	twist.linear.x=0;
+				// 	twist.linear.y=0;
+				// 	twist.linear.z=0;
+				// 	twist.angular.x=0;
+				// 	twist.angular.y=0;
+				// 	twist.angular.z=0;
+				// 	vel_pub.publish(twist);
+				// }
 				VisualizeCostCube(costcube_map);
+				showObstacle2D(costcube_map);
 			}
 			ros::Time etime = ros::Time::now();
 			cout << "Total time spent : " << (etime - stime).toSec() << endl << endl;
@@ -139,12 +152,115 @@ int main(int argc, char **argv)
 	return 1;
 }
 
+void imageCallBack(const sensor_msgs::ImageConstPtr& msg){
+	try
+	{
+		cv_bridge::CvImagePtr cv_ptr; 
+		cv_ptr = cv_bridge::toCvCopy(msg, "bgr8");
+		cv_ptr->image.copyTo(image_raw);
+		// cv::imshow("view", cv_bridge::toCvShare(msg, "bgr8")->image);
+	}
+	catch (cv_bridge::Exception& e)
+	{
+		ROS_ERROR("Could not convert from '%s' to 'mono8'.", msg->encoding.c_str());
+	}
+}
+
+void fillRect(cv::Mat& image,cv::Point center,int radius,vector<uchar> color){
+	int max_row = image.rows - 1;
+	int max_col = image.cols - 1;
+	int left_row = max(center.y - radius, 0);
+	int left_col = max(center.x - radius, 0);
+	int right_row = min(center.y + radius, max_row);
+	int right_col = min(center.x + radius, max_col);
+	for(int row=left_row;row<=right_row;row++){
+		for(int col=left_col;col<=right_col;col++){
+			image.at<cv::Vec3b>(row,col)[0] = color[2];
+			image.at<cv::Vec3b>(row,col)[1] = color[1];
+			image.at<cv::Vec3b>(row,col)[2] = color[0];
+		}
+	}
+}
+
+void showObstacle2D(cv::Mat cost_map){
+	if(!image_raw.data)
+		return;		
+	float thre_cost = 0.05;
+	float height = 0.1;
+	float f_u = 718.856;
+	float f_v = 718.856;
+	float c_u = 607.1928;
+	float c_v = 185.2157;
+	// cv::Mat empty_img(3, image_raw.size(), CV_8UC3, cv::Scalar::all(0));
+	cv::Mat image_modified = image_raw.clone();
+	// cv::Mat empty_img = cv::Mat::ones(image_raw.rows,image_raw.cols,CV_8UC3)*255;
+	// cout << image_raw.cols << " " << image_raw.rows << endl;
+	// cout << empty_img.cols << " " << empty_img.rows << endl;
+	// cout << empty_img.type() << endl;
+	// cout << image_raw.type() << endl;
+	// cv::Mat image_modified = cv::imread("/home/gxx/WorkSpace/Visual_Explore_ws/000000.png",cv::IMREAD_COLOR);
+	cv::Mat K = cv::Mat::zeros(3,3,CV_32FC1);
+	K.at<float>(0, 0) = f_u;
+	K.at<float>(1, 1) = f_v;
+	K.at<float>(0, 2) = c_u;
+	K.at<float>(1, 2) = c_v;
+	K.at<float>(2, 2) = 1.0;
+	// cout << K << endl;
+
+	for (int row = 0; row < cost_map.size[0]; ++row)
+		for (int col = 0; col < cost_map.size[1]; ++col)
+			for (int hei = 0;hei < cost_map.size[2]; ++ hei){
+				float cur_cost = cost_map.at<float>(row, col, hei);
+				if(cur_cost <= thre_cost){
+					vector<double> marker_pos{(row - cam_posid[0]) * resolution,(col - cam_posid[1]) * resolution,(hei - cam_posid[2]) * resolution};
+					// vector<double> pos = TransformPoint(Rwc,Twc,marker_pos);
+					cv::Mat point_mat = cv::Mat::zeros(3,1,CV_32FC1);
+					point_mat.at<float>(0, 0) = marker_pos[0];
+					point_mat.at<float>(1, 0) = -marker_pos[1]+height;
+					point_mat.at<float>(2, 0) = marker_pos[2];
+					cv::Mat res = K*point_mat;
+					// cout << "cam_posid: \n" << cam_posid[0] << cam_posid[1] << cam_posid[2] << endl;
+					// cout << "cost_map.size: \n"  << cost_map.size[0] << cost_map.size[1] << cost_map.size[2] << endl;
+					// cout << "point_mat: \n" << point_mat << endl;
+					// cout << "res: " << res << endl;
+					if(res.at<float>(2, 0)<=0)
+						continue;
+					int v = res.at<float>(0, 0) / res.at<float>(2, 0);
+					int u = res.at<float>(1, 0) / res.at<float>(2, 0);
+					// cout << v << " " << u << endl << endl;
+
+					cv::Point centerCircle1(v, u);
+					int radiusCircle = 30;
+					cv::Scalar colorCircle1(0, 0, int(255*cur_cost/thre_cost)); // (B, G, R)
+					// vector<uchar> colorCircle1{0, 0, uchar(255*cur_cost/thre_cost)}; // (B, G, R)
+					// vector<uchar> color  = getColor(cur_cost*100000);
+					vector<uchar> color{255,255,0};
+					// cout << cur_cost << endl;
+					// cout << int(color[0]) << " " << int(color[1]) << " " << int(color[2]) << endl;
+					int thicknessCircle1 = -1;
+					// cv::circle(image_modified, centerCircle1, radiusCircle, colorCircle1, thicknessCircle1);
+					fillRect(image_modified,centerCircle1,radiusCircle,color);
+
+					// cout << image_modified.size() << endl;
+					// cout << image_modified.cols << " " <<  image_modified.rows << endl;
+					// if(u < 0 || v < 0 || u> image_modified.cols || v > image_modified.rows)
+					// 	continue;
+					// image_modified.at<int>(v,u) = 0;
+				}
+			}
+			cv::addWeighted(image_raw,0.7,image_modified,0.3,0,image_modified);
+			sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image_modified).toImageMsg();
+			image_pub.publish(msg);
+			bool res_w = cv::imwrite("/home/gxx/WorkSpace/Visual_Explore_ws/image_modified.jpg",image_modified);
+			cv::imwrite("/home/gxx/WorkSpace/Visual_Explore_ws/image_raw.jpg",image_raw);
+}
+
 bool detectObstacle(cv::Mat cost_map){
 	int count = 0;
 	float max_cost=0;
 	for (int row = 0; row < cost_map.size[0]; ++row)
 		for (int col = 0; col < cost_map.size[1]; ++col)
-						for (int hei = 0;hei < cost_map.size[2]; ++ hei){
+			for (int hei = 0;hei < cost_map.size[2]; ++ hei){
 				float cur_cost = cost_map.at<float>(row, col, hei);
 				if(cur_cost>max_cost){
 					max_cost=cur_cost;
@@ -252,17 +368,17 @@ void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher pub
 	publisher.publish(pt_cloud);
 }
 
-vector<int> getColor(int value){
-	vector<int> startColor{0,255,0};
-	vector<int> endColor{255,255,0};	
+vector<uchar> getColor(int value){
+	vector<uchar> startColor{0,255,0};
+	vector<uchar> endColor{255,255,0};	
 	if(value >= 255)
 		return endColor;
 	else if(value <= 0)
 		return startColor;
 
-	int r_gap=endColor[0]-startColor[0];
-	int g_gap=endColor[1]-startColor[1];
-	int b_gap=endColor[2]-startColor[2];
+	uchar r_gap=endColor[0]-startColor[0];
+	uchar g_gap=endColor[1]-startColor[1];
+	uchar b_gap=endColor[2]-startColor[2];
 	
 	// int nSteps = max(abs(r), max(abs(g), abs(b)));
 	// if (nSteps < 1) nSteps = 1;
@@ -273,18 +389,18 @@ vector<int> getColor(int value){
 	// float bStep=b_gap/(float)nSteps;
 
 	// Reset the colors to the starting position
-	float rStart=startColor[0];
-	float gStart=startColor[1];
-	float bStart=startColor[2];	
+	uchar rStart=startColor[0];
+	uchar gStart=startColor[1];
+	uchar bStart=startColor[2];	
 
 	// float step = (value - 255)/255;
-	int step = value;
-	int r = rStart + r_gap * value / 255;
-	int g = gStart + g_gap * value / 255;
-	int b = bStart + b_gap * value / 255;
-	float a = value / 255;
+	// int step = value;
+	uchar r = rStart + r_gap * value / 255;
+	uchar g = gStart + g_gap * value / 255;
+	uchar b = bStart + b_gap * value / 255;
+	// float a = value / 255;
 	// cout << r << " " << g << " " << b << endl;
-	return vector<int>{r,g,b};
+	return vector<uchar>{r,g,b};
 	// return vector<int>{(int)(rStart+rStep*step+0.5),(int)(gStart+gStep*step+0.5),(int)(bStart+bStep*step+0.5)};
 }
 
@@ -357,7 +473,7 @@ void VisualizeCostCube(cv::Mat cost_map){
 		for (int col = 0; col < cost_map.size[1]; ++col){
 			for (int hei = 0;hei < cost_map.size[2]; ++ hei){
 				float cur_cost = cost_map.at<float>(row, col, hei);
-				vector<int> color  = getColor(cur_cost);
+				vector<uchar> color  = getColor(cur_cost);
 				// marker.pose.position.x = camera_pose.position.x + (row - cam_posid[0]) * resolution;
 				// marker.pose.position.y = camera_pose.position.y + (col - cam_posid[1]) * resolution;
 				// marker.pose.position.z = camera_pose.position.z + (hei - cam_posid[2]) * resolution;
@@ -528,7 +644,7 @@ void testColorfunc(ros::Publisher vis_pub,ros::Publisher vis_text_pub){
 		marker.pose.position.x = -5.0+i*resolution;
 		marker.pose.position.y = 0;
 		marker.pose.position.z = 0;
-		vector<int> color  = getColor(i);
+		vector<uchar> color  = getColor(i);
 		marker.color.r =  color[0];
 		marker.color.g = color[1];
 		marker.color.b = color[2];

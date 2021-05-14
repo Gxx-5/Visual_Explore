@@ -10,6 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   visualization_msgs
+  cv_bridge
+  image_transport
 )
 
 find_package(OpenCV 3.0 QUIET)
