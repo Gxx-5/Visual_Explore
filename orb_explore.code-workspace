@@ -19,7 +19,15 @@
 			"string_view": "cpp",
 			"utility": "cpp",
 			"ostream": "cpp",
-			"*.tcc": "cpp"
+			"*.tcc": "cpp",
+			"cmath": "cpp",
+			"functional": "cpp",
+			"ratio": "cpp",
+			"system_error": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"optional": "cpp",
+			"istream": "cpp"
 		},
 		"python.autoComplete.extraPaths": [
 			"/opt/ros/melodic/lib/python2.7/dist-packages"
