@@ -93,33 +93,54 @@ float KDE::EpaneKernel(float x)
   max=t;
  return 0.75f*max;
 }
-float KDE::computeKDE(vector<float> data_vec)
-{//Compute the values of KDE.
+float KDE::computeKDE(vector<float> data_vec)//Compute the values of KDE.
+{
+	//Compute mean and stdev
+	double sum = std::accumulate(std::begin(data_vec), std::end(data_vec), 0.0);
+	double mean =  sum / data_vec.size(); //均值 
+	double accum  = 0.0;
+	std::for_each (std::begin(data_vec), std::end(data_vec), [&](const double d) {
+		accum  += (d-mean)*(d-mean);
+	}); 
+	double stdev = sqrt(accum/(data_vec.size()-1)); //方差
+
 	int i,j;
 	size = data_vec.size();
 	float peak_value = -1.0f;
+	float peak_data;
 	float pre_value = 0.0f;
 	for(i=0;i<size;i++){
 		float cur_value = 0.0f;
 		for(j=0;j<size;j++){
 			switch(this->type){
 				case 1:
-				cur_value+=LaplaceKernel((data_vec[j]-data_vec[i])/h);break;
+					cur_value+=LaplaceKernel((data_vec[j]-data_vec[i])/h);
+					break;
 				case 2:
-				cur_value+=EpaneKernel((data_vec[j]-data_vec[i])/h);break;
+					cur_value+=EpaneKernel((data_vec[j]-data_vec[i])/h);
+					break;
 				default:
-				cur_value+=GaussKernel((data_vec[j]-data_vec[i])/h);
+					cur_value+=GaussKernel((data_vec[j]-data_vec[i])/h);
 			}
 		}
 		cur_value=cur_value/size;
 		cur_value=cur_value/h;
 		if(peak_value < 0 && cur_value < pre_value){
 			peak_value = pre_value;
+			peak_data = data_vec[i];
 			break;
 		}
 		pre_value = cur_value;
 	}
-	return peak_value;
+	double std_max = 0.0;
+	if(stdev<std_max){
+		double factor = (std_max-stdev)/std_max;
+		peak_data = peak_data * (1-factor) + factor * mean;
+	}
+	// cout << "stdev: " << stdev << endl;
+	return peak_data;
+	// return stdev;
+	// return mean;
 }
 
 void KDE::getDescribe(char cs[])

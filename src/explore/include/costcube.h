@@ -67,7 +67,7 @@ public:
 	cv::Mat calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 	void processMapPts(const std::vector<geometry_msgs::Point> &pts,bool cal_occupied_only=false);
 	bool Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied,cv::Mat &visited,bool cal_occupied_only=false);
-	float computeCostByDistance(const float distance);
+	float computeCostByDistance(float distance);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr filterCloud(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 	float dstFromVoxelToObstacle(vector<int> pos_id);
 	float dstFromVoxelToObstacle(vector<int> pos_id,KDTree tree);

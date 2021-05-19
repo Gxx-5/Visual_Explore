@@ -114,6 +114,7 @@ int main(int argc, char **argv)
 	vertical_cloud_pub = n.advertise<sensor_msgs::PointCloud>("vertical_costcloud", 10);
 	image_pub = it.advertise("image_modified",1);
 	ros::Publisher vel_pub= n.advertise<geometry_msgs::Twist>("cmd_vel",1,true);	
+	ros::Publisher filtered_cloud_pub = n.advertise<sensor_msgs::PointCloud2>("filtered_cloud", 10);
 
 	ros::Rate loop_rate(100);
 	while(ros::ok()){
@@ -126,6 +127,13 @@ int main(int argc, char **argv)
 				// ros::Time stime = ros::Time::now();
 				// cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(map_points);
 				cv::Mat costcube_map = COSTCUBE.calCostCubeByDistance(Rwc,Twc,map_cloud);
+				// pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud = COSTCUBE.filterCloud(Rwc,Twc,map_cloud);
+				// sensor_msgs::PointCloud2 ros_filtered_cloud;				
+				// pcl::toROSMsg(*filtered_cloud,ros_filtered_cloud);
+				// ros_filtered_cloud.header.frame_id = "map";
+				// ros_filtered_cloud.header.stamp = ros::Time::now();
+				// filtered_cloud_pub.publish(ros_filtered_cloud);
+				
 				// ros::Time etime = ros::Time::now();
 				// cout << "CalCostCube time spent : " << (etime - stime).toSec() << endl;
 
@@ -251,8 +259,8 @@ void showObstacle2D(cv::Mat cost_map){
 			cv::addWeighted(image_raw,0.7,image_modified,0.3,0,image_modified);
 			sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image_modified).toImageMsg();
 			image_pub.publish(msg);
-			bool res_w = cv::imwrite("/home/gxx/WorkSpace/Visual_Explore_ws/image_modified.jpg",image_modified);
-			cv::imwrite("/home/gxx/WorkSpace/Visual_Explore_ws/image_raw.jpg",image_raw);
+			// bool res_w = cv::imwrite("/home/gxx/WorkSpace/Visual_Explore_ws/image_modified.jpg",image_modified);
+			// cv::imwrite("/home/gxx/WorkSpace/Visual_Explore_ws/image_raw.jpg",image_raw);
 }
 
 bool detectObstacle(cv::Mat cost_map){

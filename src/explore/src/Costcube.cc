@@ -12,6 +12,14 @@ vector<double> TransformPoint(Eigen::Matrix3d rotation,Eigen::Vector3d translati
 	return vector<double>{point_trans(0,0),point_trans(1,0),point_trans(2,0)};
 }
 
+template <class T>
+void print_vector(vector<T> vec){
+	for(auto v:vec){
+		cout << v << ",";
+	}
+	cout << endl;
+}
+
 CostCube::CostCube(vector<double> input_vec){
 	// double* param[6]{&shooting_dst,&cam_width,&cam_height,&resolution,&dst_filter_factor,&cost_scaling_factor};
 	for(int i=0;i<input_vec.size();++i){
@@ -307,12 +315,13 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
 */
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr CostCube::filterCloud(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
-	float filter_height = 0.0;
+	float filter_height = -0.0;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
 	vector<double> marker_pos{ (0 - cam_posid[0]) * resolution,(0 - cam_posid[1]) * resolution,(0 - cam_posid[2]) * resolution};
 	vector<double> pos = TransformPoint(rotation,translation,marker_pos);
 	for(auto p : cloud->points){
 		if(p.z>pos[2] > filter_height){
+			p.z = translation[2];
 			cloud_filtered->push_back(p);
 		}
 	}
@@ -347,8 +356,10 @@ cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d
 				}
 				// map_prob.at<float>(row, col, hei) = dst*col/size[1];
 				map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
+				// cout << "kde_dst: " << dst << " ,cost: " << map_prob.at<float>(row, col, hei) << endl;
 			}
 	return map_prob;
+	// return dst_mat;
 }
 
 float CostCube::dstFromVoxelToObstacle(vector<int> pos_id){
@@ -512,7 +523,7 @@ float CostCube::dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::
 	pcl::PointXYZ searchPoint{pos[0],pos[1],pos[2]};
 	int nearby_count = 0;
 	int count=0;
-	float dst=0;
+	float dst_sum=0;
 	float cost = 0;
 	vector<float> dst_vec;
 	if(K>0){
@@ -521,7 +532,7 @@ float CostCube::dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::
 		kdtree.nearestKSearch(searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance);
 		for(vector<float>::iterator it=pointNKNSquaredDistance.begin();it!=pointNKNSquaredDistance.end();++it){
 			cost +=computeCostByDistance(*it);
-			dst+=sqrt(*it);
+			dst_sum+=sqrt(*it);
 			dst_vec.push_back(sqrt(*it));
 			count++;
 		}
@@ -534,14 +545,14 @@ float CostCube::dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::
 			// cost +=1/(sqrt(*it));
 			dst_vec.push_back(sqrt(*it));
 			cost += computeCostByDistance(*it);
-			dst += sqrt(*it);
-			cout << sqrt(*it) << endl;
+			dst_sum += sqrt(*it);
+			// cout << sqrt(*it) << endl;
 			count++;
 			if(*it<0.1)
 				nearby_count++;
-			if(count > 1000){
-				break;
-			}
+			// if(count > 1000){
+			// 	break;
+			// }
 		}
 		if(count == 0){
 			return kdtree_radius;
@@ -558,8 +569,24 @@ float CostCube::dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::
 		// 	}
 		// 	// return sqrt(pointNKNSquaredDistance[0]);
 		// }
+	}	
+	if(count<30){
+		return 0.5;
 	}
-	return kde.computeKDE(dst_vec);
+	//使用平均距离估计最近距离
+	return dst_sum/count;
+	//使用kde核密度估计计算最近距离
+	float kde_dst = kde.computeKDE(dst_vec);
+	// cout << "count: " << count << " ,kde_dst: " << kde_dst << endl;
+
+	float factor = 1.1;
+	if(count<100){
+		kde_dst *= (1+(100-count)/100)*factor;
+		// kde_dst *= factor;
+		// cout << "count: " << count << " ,kde_dst: " << kde_dst << endl;
+	}
+	// return count;
+	return kde_dst;
 	// cout << "count : " << count << endl;
 	// cout << "ave dst: " << dst/count << endl << endl;
 	// return dst/count;
@@ -615,15 +642,19 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
 	return dst/i;
 }
 
-float CostCube::computeCostByDistance(const float distance)
+float CostCube::computeCostByDistance(float distance)
 {
-	float k_r = 1000.0;
+	float k_r = 1.0;
+	float max_dst = 1.0f;
 	float cost;
 	if(distance < inscribed_radius_){
 		cost = max_cost;
-	}
+	}	
 	else{
-		cost = k_r*sqrt(1.0/distance - 1.0/kdtree_radius);
+		if(distance > 0.5){
+			distance = 0.5;
+		}
+		cost = k_r*sqrt(1.0/distance - 1.0/max_dst);
 		// cost = max_cost * exp(-1.0 * cost_scaling_factor * (distance - inscribed_radius_));
 		// cost = 255 * cost;//(unsigned char)((INSCRIBED_INFLATED_OBSTACLE - 1) * factor);
 	}

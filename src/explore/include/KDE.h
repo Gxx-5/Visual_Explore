@@ -3,6 +3,9 @@
 #include<iostream>
 #include<fstream>
 #include<vector>
+#include <numeric>
+#include <algorithm>
+
 using namespace std;
 
 class KDE
