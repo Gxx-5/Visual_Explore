@@ -1,7 +1,7 @@
 #include <queue>
 #include "costcube.h"
 
-vector<double> TransformPoint(Eigen::Matrix3d rotation,Eigen::Vector3d translation,vector<double> pos){
+vector<double> TransformPoint(const Eigen::Matrix3d &rotation,const Eigen::Vector3d &translation,const vector<double> &pos){
 	Eigen::Vector3d eulerAngle=rotation.eulerAngles(2,1,0);
 	Eigen::Matrix4d transform = Eigen::Matrix4d::Zero();
 	transform.topLeftCorner<3,3>() = rotation;
@@ -193,53 +193,53 @@ bool CostCube::Bresenham3D(const geometry_msgs::Point &pt_pos, cv::Mat &occupied
 		if ((l >= m) && (l >= n)) {
 			err_1 = dy2 - l;
 			err_2 = dz2 - l;
-			for (i = 0; i < l; i++) {                
-			++visited.at<int>(point[0], point[1], point[2]);
-			if (err_1 > 0) {
-				point[1] += y_inc;
-				err_1 -= dx2;
-			}
-			if (err_2 > 0) {
-				point[2] += z_inc;
-				err_2 -= dx2;
-			}
-			err_1 += dy2;
-			err_2 += dz2;
-			point[0] += x_inc;
+			for (i = 0; i < l; i++) {
+				++visited.at<int>(point[0], point[1], point[2]);
+				if (err_1 > 0) {
+					point[1] += y_inc;
+					err_1 -= dx2;
+				}
+				if (err_2 > 0) {
+					point[2] += z_inc;
+					err_2 -= dx2;
+				}
+				err_1 += dy2;
+				err_2 += dz2;
+				point[0] += x_inc;
 			}
 		} else if ((m >= l) && (m >= n)) {
 			err_1 = dx2 - m;
 			err_2 = dz2 - m;
 			for (i = 0; i < m; i++) {
-			++visited.at<int>(point[0], point[1], point[2]);
-			if (err_1 > 0) {
-				point[0] += x_inc;
-				err_1 -= dy2;
-			}
-			if (err_2 > 0) {
-				point[2] += z_inc;
-				err_2 -= dy2;
-			}
-			err_1 += dx2;
-			err_2 += dz2;
-			point[1] += y_inc;
+				++visited.at<int>(point[0], point[1], point[2]);
+				if (err_1 > 0) {
+					point[0] += x_inc;
+					err_1 -= dy2;
+				}
+				if (err_2 > 0) {
+					point[2] += z_inc;
+					err_2 -= dy2;
+				}
+				err_1 += dx2;
+				err_2 += dz2;
+				point[1] += y_inc;
 			}
 		} else {
 			err_1 = dy2 - n;
 			err_2 = dx2 - n;
 			for (i = 0; i < n; i++) {
-			++visited.at<int>(point[0], point[1], point[2]);
-			if (err_1 > 0) {
-				point[1] += y_inc;
-				err_1 -= dz2;
-			}
-			if (err_2 > 0) {
-				point[0] += x_inc;
-				err_2 -= dz2;
-			}
-			err_1 += dy2;
-			err_2 += dx2;
-			point[2] += z_inc;
+				++visited.at<int>(point[0], point[1], point[2]);
+				if (err_1 > 0) {
+					point[1] += y_inc;
+					err_1 -= dz2;
+				}
+				if (err_2 > 0) {
+					point[0] += x_inc;
+					err_2 -= dz2;
+				}
+				err_1 += dy2;
+				err_2 += dx2;
+				point[2] += z_inc;
 			}
 		}
 		++visited.at<int>(point[0], point[1], point[2]);
@@ -314,7 +314,7 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
 }
 */
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr CostCube::filterCloud(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
+pcl::PointCloud<pcl::PointXYZ>::Ptr CostCube::filterCloud(const Eigen::Matrix3d &rotation,const Eigen::Vector3d &translation,const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud){
 	float filter_height = -0.0;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
 	vector<double> marker_pos{ (0 - cam_posid[0]) * resolution,(0 - cam_posid[1]) * resolution,(0 - cam_posid[2]) * resolution};
@@ -328,10 +328,98 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr CostCube::filterCloud(Eigen::Matrix3d rotati
 	return cloud_filtered;
 }
 
-cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d translation,pcl::PointCloud<pcl::PointXYZ>::Ptr cloud){
+void CostCube::processOccludedArea(cv::Mat& map,const vector<vector<int>>& obs_id){
+	int i, dx, dy, dz, l, m, n, x_inc, y_inc, z_inc, err_1, err_2, dx2, dy2, dz2;
+	int point[3];
+	float cur_cost = 0.0f;
+	for(auto pos_id : obs_id){
+		cur_cost = map.at<float>(pos_id[0],pos_id[1],pos_id[2]);
+		point[0] = pos_id[0];
+		point[1] = pos_id[1];
+		point[2] = pos_id[2];
+		dx = pos_id[0] - cam_posid[0];
+		dy = pos_id[1] - cam_posid[1];
+		dz = pos_id[2] - cam_posid[2];
+		x_inc = (dx < 0) ? -1 : 1;
+		l = abs(dx);
+		y_inc = (dy < 0) ? -1 : 1;
+		m = abs(dy);
+		z_inc = (dz < 0) ? -1 : 1;
+		n = abs(dz);
+		dx2 = l << 1;
+		dy2 = m << 1;
+		dz2 = n << 1;
+		
+		if ((l >= m) && (l >= n)) {
+			err_1 = dy2 - l;
+			err_2 = dz2 - l;
+			// for (i = 0; i < l; i++) {
+			while(point[0]>=0 && point[1]>=0 && point[2]>=0 && point[0]<size[0] &&  point[1]<size[1] && point[2]<size[2]){
+				// ++visited.at<int>(point[0], point[1], point[2]);
+				map.at<float>(point[0], point[1], point[2]) += cur_cost;
+				map.at<float>(point[0], point[1], point[2]) /= 2;
+				if (err_1 > 0) {
+					point[1] += y_inc;
+					err_1 -= dx2;
+				}
+				if (err_2 > 0) {
+					point[2] += z_inc;
+					err_2 -= dx2;
+				}
+				err_1 += dy2;
+				err_2 += dz2;
+				point[0] += x_inc;
+			}
+		} else if ((m >= l) && (m >= n)) {
+			err_1 = dx2 - m;
+			err_2 = dz2 - m;
+			// for (i = 0; i < m; i++) {
+			while(point[0]>=0 && point[1]>=0 && point[2]>=0 && point[0]<size[0] &&  point[1]<size[1] && point[2]<size[2]){
+				// ++visited.at<int>(point[0], point[1], point[2]);
+				map.at<float>(point[0], point[1], point[2]) += cur_cost;
+				map.at<float>(point[0], point[1], point[2]) /= 2;
+				if (err_1 > 0) {
+					point[0] += x_inc;
+					err_1 -= dy2;
+				}
+				if (err_2 > 0) {
+					point[2] += z_inc;
+					err_2 -= dy2;
+				}
+				err_1 += dx2;
+				err_2 += dz2;
+				point[1] += y_inc;
+			}
+		} else {
+			err_1 = dy2 - n;
+			err_2 = dx2 - n;
+			// for (i = 0; i < n; i++) {
+			while(point[0]>=0 && point[1]>=0 && point[2]>=0 && point[0]<size[0] &&  point[1]<size[1] && point[2]<size[2]){
+				// ++visited.at<int>(point[0], point[1], point[2]);
+				map.at<float>(point[0], point[1], point[2]) += cur_cost;
+				map.at<float>(point[0], point[1], point[2]) /= 2;
+				if (err_1 > 0) {
+					point[1] += y_inc;
+					err_1 -= dz2;
+				}
+				if (err_2 > 0) {
+					point[0] += x_inc;
+					err_2 -= dz2;
+				}
+				err_1 += dy2;
+				err_2 += dx2;
+				point[2] += z_inc;
+			}
+		}
+		// ++visited.at<int>(point[0], point[1], point[2]);
+	}
+}
+
+cv::Mat CostCube::calCostCubeByDistance(const Eigen::Matrix3d &rotation,const Eigen::Vector3d &translation,const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud){
 	map_prob = cv::Mat::zeros(3,size,CV_32FC1);
 	dst_mat = cv::Mat::zeros(3,size,CV_32FC1);
 	occupied_ind.clear();
+	vector<vector<int>> obs_id;
 	if(cloud->size()==0){
 		cout << "no map points received!" << endl;
 		return map_prob;
@@ -342,10 +430,10 @@ cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d
 	for (int row = 0; row < size[0]; ++row)
 		for (int col = 0; col < size[1]; ++col)
 			for (int hei = 0;hei < size[2]; ++ hei){
-				if(hei < filter_triangle[row]){
-					map_prob.at<float>(row, col, hei) = 0.0;
-					continue;
-				}
+				// if(hei < filter_triangle[row]){
+				// 	map_prob.at<float>(row, col, hei) = 0.0;
+				// 	continue;
+				// }
 				vector<double> marker_pos{ (row - cam_posid[0]) * resolution,(col - cam_posid[1]) * resolution,(hei - cam_posid[2]) * resolution};
 				vector<double> pos = TransformPoint(rotation,translation,marker_pos);
 				float dst = dstFromVoxelToObstacle(pos,kdtree,int(kdtree_K));
@@ -355,9 +443,14 @@ cv::Mat CostCube::calCostCubeByDistance(Eigen::Matrix3d rotation,Eigen::Vector3d
 					return map_prob;
 				}
 				// map_prob.at<float>(row, col, hei) = dst*col/size[1];
-				map_prob.at<float>(row, col, hei) = computeCostByDistance(dst);
+				float cost = computeCostByDistance(dst);
+				map_prob.at<float>(row, col, hei) = cost;
+				if(cost > 1.9){
+					obs_id.push_back(vector<int>{row,col,hei});
+				}
 				// cout << "kde_dst: " << dst << " ,cost: " << map_prob.at<float>(row, col, hei) << endl;
 			}
+	processOccludedArea(map_prob,obs_id);
 	return map_prob;
 	// return dst_mat;
 }
@@ -516,7 +609,7 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,KDTree tree){
 	return ave_dst/ptVec.size();
 }
 
-float CostCube::dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,int K){        
+float CostCube::dstFromVoxelToObstacle(const vector<double> &pos,const pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree,const int &K){        
 	// double x = (pos_id[0] -cam_posid[0]) * resolution + cam_pos[0];
 	// double y = (pos_id[1] - cam_posid[1]) * resolution + cam_pos[1];
 	// double z = (pos_id[2] - cam_posid[2]) * resolution + cam_pos[2];
@@ -574,7 +667,8 @@ float CostCube::dstFromVoxelToObstacle(vector<double> pos,pcl::KdTreeFLANN<pcl::
 		return 0.5;
 	}
 	//使用平均距离估计最近距离
-	return dst_sum/count;
+	// return dst_sum/count;
+	
 	//使用kde核密度估计计算最近距离
 	float kde_dst = kde.computeKDE(dst_vec);
 	// cout << "count: " << count << " ,kde_dst: " << kde_dst << endl;
@@ -642,7 +736,7 @@ float CostCube::dstFromVoxelToObstacle(vector<int> pos_id,vector<geometry_msgs::
 	return dst/i;
 }
 
-float CostCube::computeCostByDistance(float distance)
+float CostCube::computeCostByDistance(const float &distance)
 {
 	float k_r = 1.0;
 	float max_dst = 1.0f;
@@ -652,7 +746,7 @@ float CostCube::computeCostByDistance(float distance)
 	}	
 	else{
 		if(distance > 0.5){
-			distance = 0.5;
+			cout << "current distance is " << distance << " ,greater than 0.5." << endl;
 		}
 		cost = k_r*sqrt(1.0/distance - 1.0/max_dst);
 		// cost = max_cost * exp(-1.0 * cost_scaling_factor * (distance - inscribed_radius_));

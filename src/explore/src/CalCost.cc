@@ -31,6 +31,11 @@ double resolution;//resolution of CostCube
 vector<double> input_vec;//initial param of CostCube 
 double obs_cost;
 int obs_count;
+//相机内参
+float f_u = 718.856;
+float f_v = 718.856;
+float c_u = 607.1928;
+float c_v = 185.2157;
 std::string cloud_name = "/ros_cloud";
 std::string pose_name = "/cam_pose";
 Eigen::Matrix3d Rwc;
@@ -52,7 +57,7 @@ image_transport::Publisher image_pub;
 std::mutex mpt_mutex;
 std::mutex pose_mutex;
 
-void VisualizeCostCube(cv::Mat cost_map);
+void VisualizeCostCube(const cv::Mat &cost_map);
 void testColorfunc();
 void parseParams(int argc, char **argv);
 void printParams();
@@ -64,8 +69,8 @@ void poseCallback(const geometry_msgs::PoseStamped &pose);
 void poseStampedCallback(const geometry_msgs::PoseStamped &pose);
 bool detectObstacle(cv::Mat cost_map);
 void imageCallBack(const sensor_msgs::ImageConstPtr& msg);
-void showObstacle2D(cv::Mat cost_map);
-vector<uchar> getColor(int value);
+void showObstacle2D(const cv::Mat &cost_map,const float &thre_cost);
+vector<uchar> getColor(const float& value);
 
 template <typename Func,typename Var,typename Ret>
 void getTime(Func func,Var var,Ret ret){
@@ -149,7 +154,7 @@ int main(int argc, char **argv)
 				// 	vel_pub.publish(twist);
 				// }
 				VisualizeCostCube(costcube_map);
-				showObstacle2D(costcube_map);
+				showObstacle2D(costcube_map,1.15);
 			}
 			ros::Time etime = ros::Time::now();
 			cout << "Total time spent : " << (etime - stime).toSec() << endl << endl;
@@ -190,15 +195,12 @@ void fillRect(cv::Mat& image,cv::Point center,int radius,vector<uchar> color){
 	}
 }
 
-void showObstacle2D(cv::Mat cost_map){
+void showObstacle2D(const cv::Mat &cost_map,const float &thre_cost){
 	if(!image_raw.data)
 		return;		
-	float thre_cost = 0.05;
+	// float thre_cost = 1.19;
 	float height = 0.1;
-	float f_u = 718.856;
-	float f_v = 718.856;
-	float c_u = 607.1928;
-	float c_v = 185.2157;
+
 	// cv::Mat empty_img(3, image_raw.size(), CV_8UC3, cv::Scalar::all(0));
 	cv::Mat image_modified = image_raw.clone();
 	// cv::Mat empty_img = cv::Mat::ones(image_raw.rows,image_raw.cols,CV_8UC3)*255;
@@ -241,8 +243,9 @@ void showObstacle2D(cv::Mat cost_map){
 					int radiusCircle = 30;
 					cv::Scalar colorCircle1(0, 0, int(255*cur_cost/thre_cost)); // (B, G, R)
 					// vector<uchar> colorCircle1{0, 0, uchar(255*cur_cost/thre_cost)}; // (B, G, R)
-					// vector<uchar> color  = getColor(cur_cost*100000);
-					vector<uchar> color{255,255,0};
+					vector<uchar> color  = getColor(cur_cost*100000);
+					// vector<uchar> color{255,255,0};
+
 					// cout << cur_cost << endl;
 					// cout << int(color[0]) << " " << int(color[1]) << " " << int(color[2]) << endl;
 					int thicknessCircle1 = -1;
@@ -376,26 +379,22 @@ void PublishMapPoints(vector<geometry_msgs::Point> map_points,ros::Publisher pub
 	publisher.publish(pt_cloud);
 }
 
-vector<uchar> getColor(int value){
+vector<uchar> getColor(const float& value){
 	vector<uchar> startColor{0,255,0};
-	vector<uchar> endColor{255,255,0};	
-	if(value >= 255)
+	vector<uchar> endColor{255,255,0};
+	float max_val = 2.0f;
+	float min_val = 1.0f; 
+	float interval = max_val - min_val;
+
+	if(value >= max_val)
 		return endColor;
-	else if(value <= 0)
+	else if(value <= min_val)
 		return startColor;
 
 	uchar r_gap=endColor[0]-startColor[0];
 	uchar g_gap=endColor[1]-startColor[1];
 	uchar b_gap=endColor[2]-startColor[2];
 	
-	// int nSteps = max(abs(r), max(abs(g), abs(b)));
-	// if (nSteps < 1) nSteps = 1;
-	// int nSteps = 255;
-	// Calculate the step size for each color
-	// float rStep=r_gap/(float)nSteps;
-	// float gStep=g_gap/(float)nSteps;
-	// float bStep=b_gap/(float)nSteps;
-
 	// Reset the colors to the starting position
 	uchar rStart=startColor[0];
 	uchar gStart=startColor[1];
@@ -403,16 +402,16 @@ vector<uchar> getColor(int value){
 
 	// float step = (value - 255)/255;
 	// int step = value;
-	uchar r = rStart + r_gap * value / 255;
-	uchar g = gStart + g_gap * value / 255;
-	uchar b = bStart + b_gap * value / 255;
+	uchar r = rStart + r_gap * value / interval;
+	uchar g = gStart + g_gap * value / interval;
+	uchar b = bStart + b_gap * value / interval;
 	// float a = value / 255;
 	// cout << r << " " << g << " " << b << endl;
 	return vector<uchar>{r,g,b};
 	// return vector<int>{(int)(rStart+rStep*step+0.5),(int)(gStart+gStep*step+0.5),(int)(bStart+bStep*step+0.5)};
 }
 
-void VisualizeCostCube(cv::Mat cost_map){
+void VisualizeCostCube(const cv::Mat& cost_map){
 	if(cost_map.empty()){
 		cout << "CostCube map is empty." << endl;
 		return;

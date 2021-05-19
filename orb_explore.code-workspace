@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../ORB_SLAM2"
+		},
+		{
+			"path": "../ORB_SLAM2_grid_navigation-master"
 		}
 	],
 	"settings": {
