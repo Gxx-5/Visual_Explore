@@ -743,7 +743,7 @@ float CostCube::computeCostByDistance(const float &distance)
 	float cost;
 	if(distance < inscribed_radius_){
 		cost = max_cost;
-	}	
+	}
 	else{
 		if(distance > 0.5){
 			cout << "current distance is " << distance << " ,greater than 0.5." << endl;

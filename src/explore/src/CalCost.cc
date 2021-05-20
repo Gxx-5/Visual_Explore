@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include "geometry_msgs/Point.h"
 #include <vector>
+#include "std_msgs/Float64.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/PoseArray.h"
 #include "geometry_msgs/Twist.h"
@@ -36,6 +37,10 @@ float f_u = 718.856;
 float f_v = 718.856;
 float c_u = 607.1928;
 float c_v = 185.2157;
+float free_cost = 1.4;
+float param1 = 0.0;
+float param2 = 0.1;
+float param3 = 0.0;
 std::string cloud_name = "/ros_cloud";
 std::string pose_name = "/cam_pose";
 Eigen::Matrix3d Rwc;
@@ -71,6 +76,9 @@ bool detectObstacle(cv::Mat cost_map);
 void imageCallBack(const sensor_msgs::ImageConstPtr& msg);
 void showObstacle2D(const cv::Mat &cost_map,const float &thre_cost);
 vector<uchar> getColor(const float& value);
+void paramCallBack1(const std_msgs::Float64ConstPtr& msg);
+void paramCallBack2(const std_msgs::Float64ConstPtr& msg);
+void paramCallBack3(const std_msgs::Float64ConstPtr& msg);
 
 template <typename Func,typename Var,typename Ret>
 void getTime(Func func,Var var,Ret ret){
@@ -107,6 +115,9 @@ int main(int argc, char **argv)
 	// ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud2>(cloud_name,1,&preProcess2);
 	ros::Subscriber cloud_sub = n.subscribe<sensor_msgs::PointCloud2>(cloud_name,1,&preProcessRosMsg2Pcl);
 	ros::Subscriber image_sub = n.subscribe<sensor_msgs::Image>("debug_image",1,&imageCallBack);
+	ros::Subscriber param_sub1 = n.subscribe<std_msgs::Float64>("param_topic1",1,&paramCallBack1);
+	ros::Subscriber param_sub2 = n.subscribe<std_msgs::Float64>("param_topic2",1,&paramCallBack2);
+	ros::Subscriber param_sub3 = n.subscribe<std_msgs::Float64>("param_topic3",1,&paramCallBack3);
 
 	//Publish
 	// pt_pub = n.advertise<sensor_msgs::PointCloud>("pt_cloud",10);
@@ -154,7 +165,7 @@ int main(int argc, char **argv)
 				// 	vel_pub.publish(twist);
 				// }
 				VisualizeCostCube(costcube_map);
-				showObstacle2D(costcube_map,1.4);
+				showObstacle2D(costcube_map,free_cost);
 			}
 			ros::Time etime = ros::Time::now();
 			cout << "Total time spent : " << (etime - stime).toSec() << endl << endl;
@@ -163,6 +174,16 @@ int main(int argc, char **argv)
 		loop_rate.sleep();
 	}
 	return 1;
+}
+
+void paramCallBack1(const std_msgs::Float64ConstPtr& msg){
+	param1 = msg->data;
+}
+void paramCallBack2(const std_msgs::Float64ConstPtr& msg){
+	param2 = msg->data;
+}
+void paramCallBack3(const std_msgs::Float64ConstPtr& msg){
+	param3 = msg->data;
 }
 
 void imageCallBack(const sensor_msgs::ImageConstPtr& msg){
@@ -198,9 +219,9 @@ void fillRect(cv::Mat& image,cv::Point center,int radius,vector<uchar> color){
 void showObstacle2D(const cv::Mat &cost_map,const float &thre_cost){
 	if(!image_raw.data)
 		return;	
-	// float thre_cost = 1.19;
-	float height = 0.1;
-
+	// float height = 0.1;
+	float shift[3]{param1,param2,param3};
+	cout << param1 << " , " << param2 << " , " << param3 << endl;
 	// cv::Mat empty_img(3, image_raw.size(), CV_8UC3, cv::Scalar::all(0));
 	cv::Mat image_modified = image_raw.clone();
 	// cv::Mat empty_img = cv::Mat::ones(image_raw.rows,image_raw.cols,CV_8UC3)*255;
@@ -225,9 +246,9 @@ void showObstacle2D(const cv::Mat &cost_map,const float &thre_cost){
 					vector<double> marker_pos{(row - cam_posid[0]) * resolution,(col - cam_posid[1]) * resolution,(hei - cam_posid[2]) * resolution};
 					// vector<double> pos = TransformPoint(Rwc,Twc,marker_pos);
 					cv::Mat point_mat = cv::Mat::zeros(3,1,CV_32FC1);
-					point_mat.at<float>(0, 0) = marker_pos[0];
-					point_mat.at<float>(1, 0) = -marker_pos[1]+height;
-					point_mat.at<float>(2, 0) = marker_pos[2];
+					point_mat.at<float>(0, 0) = marker_pos[0]+shift[0];
+					point_mat.at<float>(1, 0) = -marker_pos[1]+shift[1];
+					point_mat.at<float>(2, 0) = marker_pos[2]+shift[2];
 					cv::Mat res = K*point_mat;
 					// cout << "cam_posid: \n" << cam_posid[0] << cam_posid[1] << cam_posid[2] << endl;
 					// cout << "cost_map.size: \n"  << cost_map.size[0] << cost_map.size[1] << cost_map.size[2] << endl;
@@ -480,6 +501,9 @@ void VisualizeCostCube(const cv::Mat& cost_map){
 		for (int col = 0; col < cost_map.size[1]; ++col){
 			for (int hei = 0;hei < cost_map.size[2]; ++ hei){
 				float cur_cost = cost_map.at<float>(row, col, hei);
+				// if(cur_cost>free_cost){
+				// 	continue;
+				// }
 				vector<uchar> color  = getColor(cur_cost);
 				// marker.pose.position.x = camera_pose.position.x + (row - cam_posid[0]) * resolution;
 				// marker.pose.position.y = camera_pose.position.y + (col - cam_posid[1]) * resolution;
