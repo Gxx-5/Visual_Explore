@@ -154,7 +154,7 @@ int main(int argc, char **argv)
 				// 	vel_pub.publish(twist);
 				// }
 				VisualizeCostCube(costcube_map);
-				showObstacle2D(costcube_map,1.15);
+				showObstacle2D(costcube_map,1.4);
 			}
 			ros::Time etime = ros::Time::now();
 			cout << "Total time spent : " << (etime - stime).toSec() << endl << endl;
@@ -197,7 +197,7 @@ void fillRect(cv::Mat& image,cv::Point center,int radius,vector<uchar> color){
 
 void showObstacle2D(const cv::Mat &cost_map,const float &thre_cost){
 	if(!image_raw.data)
-		return;		
+		return;	
 	// float thre_cost = 1.19;
 	float height = 0.1;
 

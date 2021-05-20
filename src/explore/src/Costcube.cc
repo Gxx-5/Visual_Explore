@@ -315,12 +315,12 @@ cv::Mat CostCube::calCostCubeByDistance(vector<geometry_msgs::Point> map_points)
 */
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr CostCube::filterCloud(const Eigen::Matrix3d &rotation,const Eigen::Vector3d &translation,const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud){
-	float filter_height = -0.0;
+	float filter_height = -0.05;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
 	vector<double> marker_pos{ (0 - cam_posid[0]) * resolution,(0 - cam_posid[1]) * resolution,(0 - cam_posid[2]) * resolution};
 	vector<double> pos = TransformPoint(rotation,translation,marker_pos);
 	for(auto p : cloud->points){
-		if(p.z>pos[2] > filter_height){
+		if(p.z > pos[2]+filter_height){
 			p.z = translation[2];
 			cloud_filtered->push_back(p);
 		}
@@ -445,7 +445,7 @@ cv::Mat CostCube::calCostCubeByDistance(const Eigen::Matrix3d &rotation,const Ei
 				// map_prob.at<float>(row, col, hei) = dst*col/size[1];
 				float cost = computeCostByDistance(dst);
 				map_prob.at<float>(row, col, hei) = cost;
-				if(cost > 1.9){
+				if(cost > 1.7){
 					obs_id.push_back(vector<int>{row,col,hei});
 				}
 				// cout << "kde_dst: " << dst << " ,cost: " << map_prob.at<float>(row, col, hei) << endl;
@@ -667,8 +667,8 @@ float CostCube::dstFromVoxelToObstacle(const vector<double> &pos,const pcl::KdTr
 		return 0.5;
 	}
 	//使用平均距离估计最近距离
-	// return dst_sum/count;
-	
+	return dst_sum/count;
+
 	//使用kde核密度估计计算最近距离
 	float kde_dst = kde.computeKDE(dst_vec);
 	// cout << "count: " << count << " ,kde_dst: " << kde_dst << endl;

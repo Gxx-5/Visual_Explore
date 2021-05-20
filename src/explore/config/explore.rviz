@@ -161,8 +161,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 1.116123914718628
-        Min Value: -0.35587799549102783
+        Max Value: 1.5114316940307617
+        Min Value: -0.2025996744632721
         Value: true
       Axis: Y
       Channel Name: intensity
@@ -215,9 +215,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 45
+      Max Intensity: 175
       Min Color: 0; 0; 0
-      Min Intensity: 16
+      Min Intensity: 120
       Name: PointCloud
       Position Transformer: XYZ
       Queue Size: 10
@@ -278,15 +278,15 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 1.1131720542907715
+      Distance: 6.439517498016357
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 5.044073581695557
-        Y: 0.4123806059360504
+        X: 0.5710034370422363
+        Y: 0.017473220825195312
         Z: -1.8813789210980758e-6
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
